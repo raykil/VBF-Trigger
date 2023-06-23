@@ -5,6 +5,8 @@ import vector
 import mplhep as hep
 import matplotlib.pyplot as plt
 import os
+from optparse import OptionParser
+parser = OptionParser(usage="%prog [options]")
 from scipy.stats import beta
 
 ### FUNCTION DEFINITION ###
@@ -18,7 +20,7 @@ def GetMaxMjj(Jets):
 def GetMaxEta(Jets):
     JetCombo = ak.combinations(Jets,2, fields=["jet1","jet2"])
     etacombo = vector.Spatial.deltaeta(JetCombo.jet1, JetCombo.jet2)
-    maxeta   = ak.max(etacombo, axis=1)
+    maxeta   = ak.max(abs(etacombo), axis=1)
     return maxeta
 
 def clopper_pearson_interval(hltPassed, total, confidence):
@@ -31,81 +33,56 @@ def clopper_pearson_interval(hltPassed, total, confidence):
     max = max - center
     return min, max
 
+parser.add_option("--whichfiles" , dest="whichfiles" , default="singlemuon"       , help="options: singlemuon, zerobias")
+parser.add_option("--triggerpath", dest="triggerpath", default="pt105Analysis"    , help="options: pt105Analysis, pt125Analysis")
+parser.add_option("--analysis"   , dest="analysis"   , default="LeadJetPtAnalysis", help="options: LeadJetPtAnalysis, SubleadJetPtAnalysis, MjjAnalysis, DetaAnalysis")
+parser.add_option("--tightcuts"  , dest="tightcuts"  , default=False              , help="options: True, False")
+(options, args) = parser.parse_args()
 
-### ACCESSING FILES ###
+whichfiles  = options.whichfiles
+triggerpath = options.triggerpath
+analysis    = options.analysis
+TightCuts   = options.tightcuts
 
-# Which files?
-singlemuon = True
-zerobias   = False
-
-# Which Trigger Path?
-pt105Analysis       = True
-pt105tripleAnalysis = False
-pt125Analysis       = False
-pt125tripleAnalysis = False
-
-# Which Analysis?
-LeadJetPtAnalysis    = True
-SubleadJetPtAnalysis = False
-MjjAnalysis          = False
-DetaAnalysis         = False
-
-if singlemuon: 
+if whichfiles=="singlemuon": 
     path = "/eos/user/j/jkil/SUEP/suep-production/summer23data/singlemuon/"
     datasetname = "SingleMuon"
-if zerobias: 
+if whichfiles=="zerobias": 
     path = "/eos/user/j/jkil/SUEP/suep-production/summer23data/zerobias/"
     datasetname = "ZeroBias"
 names = os.listdir(path)[:10]
 
 # Trigger path dictionaries (before processing)
-# To make the cuts tighter, change the values here.
-# Remember, I shuold change the values for the vars that I am NOT plotting. Double check the "Which Analysis?" part.
-if pt105Analysis:
+# Remember, I should change the values for the vars that I am NOT plotting. Double check the "Which Analysis?" part.
+
+if triggerpath=="pt105Analysis":
     triggerdict = {
-        "branch": "pt105",
         "leadjetpt": 105,
         "subleadjetpt": 40,
         "mjj": 1000,
-        "deta": 3.5
+        "deta": 3.5,
     }
 
-if pt105tripleAnalysis:
+if triggerpath=="pt125Analysis":
     triggerdict = {
-        "branch": "pt105triple",
-        "leadjetpt": 105,
-        "subleadjetpt": 40,
-        "mjj": 1000,
-        "deta": 3.5
-    }
-
-if pt125Analysis:
-    triggerdict = {
-        "branch": "pt125",
         "leadjetpt": 125,
         "subleadjetpt": 45,
         "mjj": 720,
-        "deta": 3.0
+        "deta": 3.0,
     }
 
-if pt125tripleAnalysis:
-    triggerdict = {
-        "branch": "pt125triple",
-        "leadjetpt": 125,
-        "subleadjetpt": 45,
-        "mjj": 720,
-        "deta": 3.0
-    }
+if TightCuts: # This is where I update the cuts!
+    if analysis!="LeadJetPtAnalysis"   : triggerdict.update({"leadjetpt": 130})
+    if analysis!="SubleadJetPtAnalysis": triggerdict.update({"subleadjetpt": 45})
+    if analysis!="MjjAnalysis"         : triggerdict.update({"mjj": 1000})
+    if analysis!="DetaAnalysis"        : triggerdict.update({"deta": 4.0})
 
 ### PROCESSING ###
 
-mjjs, dEtas, HLTpassedJets = [],[],[]
-OFFJets = []
-counter = 0
+mjjs, dEtas, HLTpassedJets, OFFJets = [],[],[],[]
 
 for filename in names:
-    if counter%5==0:
-        print("Processing {0}th file {1}".format(counter,filename))
+    print("Processing file {0}".format(filename))
     f = uproot.open(path + filename)
     events = f["Events"]
     HLTJets = ak.zip({
@@ -121,7 +98,8 @@ for filename in names:
         "phi": events["Jet_phi"].array(),
         "mass": events["Jet_mass"].array()
     })
-    HLTpassedJet = OFFJet[HLTJets.pt105] # should change according to trigger path
+    if triggerpath=="pt105Analysis": HLTpassedJet = OFFJet[HLTJets.pt105|HLTJets.pt105triple]
+    if triggerpath=="pt125Analysis": HLTpassedJet = OFFJet[HLTJets.pt125|HLTJets.pt125triple]
     HLTnJetCut = (ak.num(HLTpassedJet)>=2)
     HLTpassedJet = HLTpassedJet[HLTnJetCut]
     HLTpassedJets = np.concatenate((HLTpassedJets, HLTpassedJet))
@@ -129,37 +107,36 @@ for filename in names:
     nJetCut = (ak.num(OFFJet)>=2)
     OFFJet = OFFJet[nJetCut]
 
-    if not LeadJetPtAnalysis:
-        # Make tighter cuts on other variables when plotting wrt one variable.
+    if analysis!="LeadJetPtAnalysis":
         leadPtCut = (ak.max(OFFJet.pt, axis=1)>=triggerdict["leadjetpt"])
         OFFJet = OFFJet[leadPtCut]
 
-    if not SubleadJetPtAnalysis:
+    if analysis!="SubleadJetPtAnalysis":
         subLeadPtCut = (OFFJet.pt[:,1]>triggerdict["subleadjetpt"])
         OFFJet = OFFJet[subLeadPtCut]
 
-    if not MjjAnalysis:
+    if analysis!="MjjAnalysis":
         mjj  = GetMaxMjj(OFFJet) # This is calculating mjj without mjj cut.
         mjjCut = (mjj>triggerdict["mjj"])
         OFFJet = OFFJet[mjjCut]
-        dEta = GetMaxEta(OFFJet) # This is correct placement!
+        dEta = GetMaxEta(OFFJet)
 
-    if not DetaAnalysis: 
+    if analysis!="DetaAnalysis": 
         dEta = GetMaxEta(OFFJet)
         deltaEtaCut = (dEta > triggerdict["deta"])
         OFFJet = OFFJet[deltaEtaCut]
-        mjj  = GetMaxMjj(OFFJet) # This is correct placement!
+        mjj  = GetMaxMjj(OFFJet)
 
     mjjs    = np.concatenate((mjjs, mjj))
     dEtas   = np.concatenate((dEtas, dEta))
     OFFJets = np.concatenate((OFFJets, OFFJet))
-    counter+=1
 
 print("number of HLT passed Jets: {}".format(len(HLTpassedJets)))
+print("number of OFF Jets: {}".format(len(OFFJets)))
 
 # Analysis variable dictionaries (after data processing)
 
-if LeadJetPtAnalysis:
+if analysis=="LeadJetPtAnalysis":
     vardict = {
         "plotname": "leadpt",
         "binsize"  : 5,
@@ -170,7 +147,7 @@ if LeadJetPtAnalysis:
         "threshold": triggerdict["leadjetpt"],
     }
 
-if SubleadJetPtAnalysis:
+if analysis=="SubleadJetPtAnalysis":
     vardict = {
         "plotname": "subleadpt",
         "binsize"  : 2,
@@ -181,7 +158,7 @@ if SubleadJetPtAnalysis:
         "threshold": triggerdict["subleadjetpt"],
     }
 
-if MjjAnalysis:
+if analysis=="MjjAnalysis":
     vardict = {
         "plotname": "mjj",
         "binsize"  : 50,
@@ -192,7 +169,7 @@ if MjjAnalysis:
         "threshold": triggerdict["mjj"],
     }
 
-if DetaAnalysis:
+if analysis=="DetaAnalysis":
     vardict = {
         "plotname": "deta",
         "binsize"  : 0.1,
@@ -220,7 +197,8 @@ for i in range(len(bincenter)):
 errmin, errmax = np.nan_to_num(errmin), np.nan_to_num(errmax)
 
 ### PLOTTING ###
-pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/"
+if triggerpath=="pt105Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt105/"
+if triggerpath=="pt125Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt125/"
 plt.style.use(hep.style.CMS)
 plt.figure()
 
@@ -233,11 +211,16 @@ hep.cms.lumitext(r"Run3 Summer23 (13 TeV)")
 plt.axvline(x=vardict["threshold"], color='tab:red', label="Threshold", linestyle="--")
 
 plt.text(0,1.0,"dataset: {}".format(datasetname), size='x-small', color='steelblue')
-if not LeadJetPtAnalysis: plt.text(0,0.95,"leadptcut: {}".format(triggerdict["leadjetpt"]), size='x-small', color='steelblue')
-if not SubleadJetPtAnalysis: plt.text(0,0.9,"subleadptcut: {}".format(triggerdict["subleadjetpt"]), size='x-small', color='steelblue')
-if not MjjAnalysis: plt.text(0,0.85,"mjjcut: {}".format(triggerdict["mjj"]), size='x-small', color='steelblue')
-if not DetaAnalysis: plt.text(0,0.8,"detacut: {}".format(triggerdict["deta"]), size='x-small', color='steelblue')
+if analysis!="LeadJetPtAnalysis":    plt.text(0,0.95,"leadptcut: {}".format(triggerdict["leadjetpt"]), size='x-small', color='steelblue')
+if analysis!="SubleadJetPtAnalysis": plt.text(0,0.9,"subleadptcut: {}".format(triggerdict["subleadjetpt"]), size='x-small', color='steelblue')
+if analysis!="MjjAnalysis":          plt.text(0,0.85,"mjjcut: {}".format(triggerdict["mjj"]), size='x-small', color='steelblue')
+if analysis!="DetaAnalysis":         plt.text(0,0.8,"detacut: {}".format(triggerdict["deta"]), size='x-small', color='steelblue')
 
 plt.legend(loc=2)
 plt.grid()
-plt.savefig("{0}{1}{2}Eff.png".format(pltPath,datasetname,vardict["plotname"]))
+if TightCuts: 
+    plt.savefig("{0}{1}{2}TightEff.png".format(pltPath,datasetname,vardict["plotname"]))
+    print("Plots made! Name: {0}{1}{2}TightEff.png".format(pltPath,datasetname,vardict["plotname"]))
+else:           
+    plt.savefig("{0}{1}{2}Eff.png".format(pltPath,datasetname,vardict["plotname"]))
+    print("Plots made! Name: {0}{1}{2}Eff.png".format(pltPath,datasetname,vardict["plotname"]))
