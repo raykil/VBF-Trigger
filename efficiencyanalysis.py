@@ -72,10 +72,17 @@ if triggerpath=="pt125Analysis":
     }
 
 if TightCuts: # This is where I update the cuts!
-    if analysis!="LeadJetPtAnalysis"   : triggerdict.update({"leadjetpt": 130})
-    if analysis!="SubleadJetPtAnalysis": triggerdict.update({"subleadjetpt": 45})
-    if analysis!="MjjAnalysis"         : triggerdict.update({"mjj": 1000})
-    if analysis!="DetaAnalysis"        : triggerdict.update({"deta": 4.0})
+    if triggerpath=="pt105Analysis":
+        if analysis!="LeadJetPtAnalysis"   : triggerdict.update({"leadjetpt": 130})
+        if analysis!="SubleadJetPtAnalysis": triggerdict.update({"subleadjetpt": 60})
+        if analysis!="MjjAnalysis"         : triggerdict.update({"mjj": 1300})
+        if analysis!="DetaAnalysis"        : triggerdict.update({"deta": 3.8})
+    if triggerpath=="pt125Analysis":
+        if analysis!="LeadJetPtAnalysis"   : triggerdict.update({"leadjetpt": 130})
+        if analysis!="SubleadJetPtAnalysis": triggerdict.update({"subleadjetpt": 60})
+        if analysis!="MjjAnalysis"         : triggerdict.update({"mjj": 1300})
+        if analysis!="DetaAnalysis"        : triggerdict.update({"deta": 3.8})
+
 
 ### PROCESSING ###
 
@@ -102,34 +109,44 @@ for filename in names:
     if triggerpath=="pt125Analysis": HLTpassedJet = OFFJet[HLTJets.pt125|HLTJets.pt125triple]
     HLTnJetCut = (ak.num(HLTpassedJet)>=2)
     HLTpassedJet = HLTpassedJet[HLTnJetCut]
-    HLTpassedJets = np.concatenate((HLTpassedJets, HLTpassedJet))
 
     nJetCut = (ak.num(OFFJet)>=2)
     OFFJet = OFFJet[nJetCut]
 
     if analysis!="LeadJetPtAnalysis":
-        leadPtCut = (ak.max(OFFJet.pt, axis=1)>=triggerdict["leadjetpt"])
-        OFFJet = OFFJet[leadPtCut]
+        OFFleadPtCut = (ak.max(OFFJet.pt, axis=1)>=triggerdict["leadjetpt"])
+        HLTleadPtCut = (ak.max(HLTpassedJet.pt, axis=1)>=triggerdict["leadjetpt"])
+        OFFJet = OFFJet[OFFleadPtCut]
+        HLTpassedJet = HLTpassedJet[HLTleadPtCut]
 
     if analysis!="SubleadJetPtAnalysis":
-        subLeadPtCut = (OFFJet.pt[:,1]>triggerdict["subleadjetpt"])
-        OFFJet = OFFJet[subLeadPtCut]
+        OFFsubLeadPtCut = (OFFJet.pt[:,1]>triggerdict["subleadjetpt"])
+        HLTsubLeadPtCut = (HLTpassedJet.pt[:,1]>triggerdict["subleadjetpt"])
+        OFFJet = OFFJet[OFFsubLeadPtCut]
+        HLTpassedJet = HLTpassedJet[HLTsubLeadPtCut]
 
     if analysis!="MjjAnalysis":
-        mjj  = GetMaxMjj(OFFJet) # This is calculating mjj without mjj cut.
-        mjjCut = (mjj>triggerdict["mjj"])
-        OFFJet = OFFJet[mjjCut]
+        OFFmjj  = GetMaxMjj(OFFJet) # This is calculating mjj without mjj cut.
+        OFFmjjCut = (OFFmjj>triggerdict["mjj"])
+        OFFJet = OFFJet[OFFmjjCut]
+        HLTmjj = GetMaxMjj(HLTpassedJet)
+        HLTmjjCut = (HLTmjj>triggerdict["mjj"])
+        HLTpassedJet = HLTpassedJet[HLTmjjCut]
         dEta = GetMaxEta(OFFJet)
 
     if analysis!="DetaAnalysis": 
-        dEta = GetMaxEta(OFFJet)
-        deltaEtaCut = (dEta > triggerdict["deta"])
-        OFFJet = OFFJet[deltaEtaCut]
+        OFFdEta = GetMaxEta(OFFJet)
+        OFFdeltaEtaCut = (OFFdEta > triggerdict["deta"])
+        OFFJet = OFFJet[OFFdeltaEtaCut]
+        HLTdEta = GetMaxEta(HLTpassedJet)
+        HLTdeltaEtaCut = (HLTdEta > triggerdict["deta"])
+        HLTpassedJet = HLTpassedJet[HLTdeltaEtaCut]
         mjj  = GetMaxMjj(OFFJet)
 
-    mjjs    = np.concatenate((mjjs, mjj))
-    dEtas   = np.concatenate((dEtas, dEta))
+    #mjjs    = np.concatenate((mjjs, OFFmjj))
+    #dEtas   = np.concatenate((dEtas, OFFdEta))
     OFFJets = np.concatenate((OFFJets, OFFJet))
+    HLTpassedJets = np.concatenate((HLTpassedJets, HLTpassedJet))
 
 print("number of HLT passed Jets: {}".format(len(HLTpassedJets)))
 print("number of OFF Jets: {}".format(len(OFFJets)))
@@ -207,7 +224,7 @@ plt.xlabel(vardict["xlabel"])
 plt.ylabel("Efficiency")
 plt.ylim(-0.06,1.2)
 hep.cms.text("Preliminary")
-hep.cms.lumitext(r"Run3 Summer23 (13 TeV)")
+hep.cms.lumitext(r"Summer23 (L=1.01 fb$^{-1}$)")
 plt.axvline(x=vardict["threshold"], color='tab:red', label="Threshold", linestyle="--")
 
 plt.text(0,1.0,"dataset: {}".format(datasetname), size='x-small', color='steelblue')
