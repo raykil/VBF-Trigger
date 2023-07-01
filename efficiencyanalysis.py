@@ -11,11 +11,12 @@ from scipy.stats import beta
 
 ### FUNCTION DEFINITION ###
 def GetMaxMjj(Jets):
-    JetCombo = ak.combinations(Jets,2, fields=["jet1","jet2"])
-    jjCombo  = JetCombo.jet1 + JetCombo.jet2
-    mjjCombo = np.sqrt(np.abs((jjCombo.E)**2 - (jjCombo.px**2 + jjCombo.py**2 + jjCombo.pz**2)))
-    maxmjj   = ak.max(mjjCombo,axis=1)
-    return maxmjj
+    jetcombo = ak.combinations(Jets,2, fields=["jet1","jet2"])
+    jjsum  = jetcombo.jet1 + jetcombo.jet2
+    maxmjj   = ak.max(jjsum.mass,axis=1)
+    maxmjjindex = ak.Array(ak.to_list(np.expand_dims(ak.argmax(jjsum.mass,axis=1),axis=1)))
+    maxmjjpair = jetcombo[maxmjjindex]
+    return maxmjj, maxmjjpair # Retriving jets: maxmjjpair.jet1 ...
 
 def GetMaxEta(Jets):
     JetCombo = ak.combinations(Jets,2, fields=["jet1","jet2"])
@@ -23,16 +24,96 @@ def GetMaxEta(Jets):
     maxeta   = ak.max(abs(etacombo), axis=1)
     return maxeta
 
-def clopper_pearson_interval(hltPassed, total, confidence):
-    alpha = (1 - confidence) / 2
-    min = beta.ppf(alpha, hltPassed, total - hltPassed + 1)
-    max = beta.ppf(1 - alpha, hltPassed + 1, total - hltPassed)
+def clopper_pearson_interval(hltPassed, total, alpha):
+    min, max = beta.ppf(alpha, hltPassed, total - hltPassed + 1), beta.ppf(1 - alpha, hltPassed + 1, total - hltPassed)
     center = 0
     if total !=0: center = hltPassed/total
-    min = center - min
-    max = max - center
+    min, max = center-min , max-center
     return min, max
 
+def DoCuts(OFFJets, HLTJets, MuonCollections, cut):
+    OFFJets = OFFJets[cut]
+    HLTJets = HLTJets[cut]
+    MuonCollections = MuonCollections[cut]
+    return OFFJets, HLTJets, MuonCollections
+
+def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections):
+    print("number of events before BasicCuts: {}".format(len(OFFJets)))
+    
+    nJetCut = (ak.num(OFFJets)>=2)
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, nJetCut)
+    print("number of events after nJetCut: {}".format(len(OFFJets)))
+
+    MuonPtCut = (ak.any(MuonCollections.Muon_pt>=27 & MuonCollections.muRelIso<0.2, axis=1))
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, MuonPtCut)
+    print("number of events after MuonPtCut: {}".format(len(OFFJets)))
+
+    IsoMu24Cut = HLTJets.IsoMu24
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, IsoMu24Cut)
+    print("number of events after IsoMu24Cut: {}".format(len(OFFJets)))
+
+    # This cut is now passing an event if it has at least one (reasonably, i.e., muRelIso<0.2) isolated muon 
+    """
+    RelIso04Cut = (ak.any(MuonCollections.muRelIso<0.2, axis=1))
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, RelIso04Cut)
+    print("number of events after RelIso04Cut: {}".format(len(OFFJets)))
+    """
+    return OFFJets, HLTJets, MuonCollections
+
+def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict):
+    print("number of events before TriggerCuts: {}".format(len(OFFJets)))
+
+    # single jet criteria
+    if analysis!="LeadJetPtAnalysis":
+        leadptCut = (OFFJets.pt[:,0]>=triggerdict["leadjetpt"])
+        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, leadptCut)
+        print("number of events after leadptCut: {}".format(len(OFFJets)))
+
+    if analysis!="SubleadJetPtAnalysis":
+        subleadptCut = (OFFJets.pt[:,1]>triggerdict["subleadjetpt"])
+        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, subleadptCut)
+        print("number of events after subleadptCut: {}".format(len(OFFJets)))
+
+# the jets that produces the maxmjj should pass the leadptCut and subleadptCut
+
+
+    # dijet criteria
+    OFFmjj, maxmjjpair = GetMaxMjj(OFFJets)
+    OFFdEta = ak.flatten(vector.Spatial.deltaeta(maxmjjpair.jet1, maxmjjpair.jet2))
+
+    if analysis!="MjjAnalysis":
+        OFFmjjCut = (OFFmjj >= triggerdict["mjj"])
+        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, OFFmjjCut)
+        maxmjjpair = maxmjjpair[OFFmjjCut]
+        OFFdEta = OFFdEta[OFFmjjCut]
+        print("number of events after OFFmjjCut: {}".format(len(OFFJets)))
+
+    if analysis!="DetaAnalysis":
+        OFFdEtaCut = (OFFdEta >= triggerdict["deta"])
+        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, OFFdEtaCut)
+        print("number of events after OFFdetaCut: {}".format(len(OFFJets)))
+
+    return OFFJets, HLTJets, MuonCollections
+
+def GetEfficiency(binsize, maxbin, HLTPassedQuantity, OFFJetQuantity):
+    bincenters = np.arange(binsize,maxbin,2*binsize)
+    effs = np.zeros(len(bincenters))
+    errmin,errmax = np.zeros(len(bincenters)), np.zeros(len(bincenters))
+
+    for i in range(len(bincenters)):
+        minlim = round(bincenters[i] - binsize,5)
+        maxlim = round(bincenters[i] + binsize,5)
+
+        nHLT = ak.count_nonzero(ak.where((HLTPassedQuantity>minlim) & (HLTPassedQuantity<=maxlim), 1, 0))
+        nOFF = ak.count_nonzero(ak.where((OFFJetQuantity   >minlim) & (OFFJetQuantity   <=maxlim), 1, 0))
+        print(minlim, maxlim, nHLT, nOFF)
+        errmin[i],errmax[i] = clopper_pearson_interval(nHLT,nOFF,0.05)
+        if nOFF!=0: effs[i] = nHLT/nOFF
+    yerrmin, yerrmax = np.nan_to_num(errmin), np.nan_to_num(errmax)
+
+    return effs, yerrmin, yerrmax, bincenters
+
+### PREPROCESSING ###
 parser.add_option("--whichfiles" , dest="whichfiles" , default="singlemuon"       , help="options: singlemuon, zerobias")
 parser.add_option("--triggerpath", dest="triggerpath", default="pt105Analysis"    , help="options: pt105Analysis, pt125Analysis")
 parser.add_option("--analysis"   , dest="analysis"   , default="LeadJetPtAnalysis", help="options: LeadJetPtAnalysis, SubleadJetPtAnalysis, MjjAnalysis, DetaAnalysis")
@@ -44,16 +125,15 @@ triggerpath = options.triggerpath
 analysis    = options.analysis
 TightCuts   = options.tightcuts
 
-if whichfiles=="singlemuon": 
+if whichfiles=="singlemuon":
     path = "/eos/user/j/jkil/SUEP/suep-production/summer23data/singlemuon/"
+    #path = "/Users/raymondkil/Desktop/vbftrigger/effrootfiles/singlemuon/"
     datasetname = "SingleMuon"
-if whichfiles=="zerobias": 
+if whichfiles=="zerobias":
     path = "/eos/user/j/jkil/SUEP/suep-production/summer23data/zerobias/"
     datasetname = "ZeroBias"
 names = os.listdir(path)[:10]
-
-# Trigger path dictionaries (before processing)
-# Remember, I should change the values for the vars that I am NOT plotting. Double check the "Which Analysis?" part.
+#names = [x for x in os.listdir(path) if x != '.DS_Store']
 
 if triggerpath=="pt105Analysis":
     triggerdict = {
@@ -71,7 +151,7 @@ if triggerpath=="pt125Analysis":
         "deta": 3.0,
     }
 
-if TightCuts: # This is where I update the cuts!
+if TightCuts:  # This is where I update the cuts!
     if triggerpath=="pt105Analysis":
         if analysis!="LeadJetPtAnalysis"   : triggerdict.update({"leadjetpt": 130})
         if analysis!="SubleadJetPtAnalysis": triggerdict.update({"subleadjetpt": 60})
@@ -85,74 +165,54 @@ if TightCuts: # This is where I update the cuts!
 
 
 ### PROCESSING ###
-
-mjjs, dEtas, HLTpassedJets, OFFJets = [],[],[],[]
-
+OFFJets, HLTJets, MuonCollections = [],ak.Array([]), []
 for filename in names:
     print("Processing file {0}".format(filename))
     f = uproot.open(path + filename)
     events = f["Events"]
-    HLTJets = ak.zip({
+
+    HLTJet = ak.zip({ # Regular array corresponding to events...... Maybe change the name to HLTPath(s) for more intuition
         "pt105":       events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5"].array(),
         "pt105triple": events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5_TriplePFJet"].array(),
         "pt125":       events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0"].array(),
-        "pt125triple": events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0_TriplePFJet"].array()
+        "pt125triple": events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0_TriplePFJet"].array(),
+
+        "IsoMu24": events["HLT_IsoMu24"].array(), #[True, True, True, True, True, False, ... False, False, False, True, True, False]]
     })
 
-    OFFJet = vector.zip({
+    OFFJet = vector.zip({ # Jagged array with subarrays corresponding to jets
         "pt": events["Jet_pt"].array(),
         "eta": events["Jet_eta"].array(),
         "phi": events["Jet_phi"].array(),
-        "mass": events["Jet_mass"].array()
+        "mass": events["Jet_mass"].array(),
+
+        "chEmEF": events["Jet_chEmEF"].array(),
+        "chHEF": events["Jet_chHEF"].array(),
+        "neEmEF": events["Jet_neEmEF"].array(),
+        "neHEF": events["Jet_neHEF"].array(),
+        "muEF": events["Jet_muEF"].array(),
     })
-    if triggerpath=="pt105Analysis": HLTpassedJet = OFFJet[HLTJets.pt105|HLTJets.pt105triple]
-    if triggerpath=="pt125Analysis": HLTpassedJet = OFFJet[HLTJets.pt125|HLTJets.pt125triple]
-    HLTnJetCut = (ak.num(HLTpassedJet)>=2)
-    HLTpassedJet = HLTpassedJet[HLTnJetCut]
 
-    nJetCut = (ak.num(OFFJet)>=2)
-    OFFJet = OFFJet[nJetCut]
+    MuonCollection = ak.zip({ # Jagged array with subarrays corresponding to muons
+        "nMuon": events["nMuon"].array(),
+        "Muon_pt": events["Muon_pt"].array(),
+        "muRelIso": events["Muon_pfRelIso04_all"].array() # relative isolation of muons [[0.0981], [0.0469, 0.362], [0.0085, ... 0.0036], [0.251, 0, 0.254, 0.412, 0.87]]
+    })
 
-    if analysis!="LeadJetPtAnalysis":
-        OFFleadPtCut = (ak.max(OFFJet.pt, axis=1)>=triggerdict["leadjetpt"])
-        HLTleadPtCut = (ak.max(HLTpassedJet.pt, axis=1)>=triggerdict["leadjetpt"])
-        OFFJet = OFFJet[OFFleadPtCut]
-        HLTpassedJet = HLTpassedJet[HLTleadPtCut]
+    OFFJets = ak.concatenate((OFFJets, OFFJet))
+    HLTJets = ak.concatenate((HLTJets, HLTJet))
+    MuonCollections = ak.concatenate((MuonCollections, MuonCollection))
 
-    if analysis!="SubleadJetPtAnalysis":
-        OFFsubLeadPtCut = (OFFJet.pt[:,1]>triggerdict["subleadjetpt"])
-        HLTsubLeadPtCut = (HLTpassedJet.pt[:,1]>triggerdict["subleadjetpt"])
-        OFFJet = OFFJet[OFFsubLeadPtCut]
-        HLTpassedJet = HLTpassedJet[HLTsubLeadPtCut]
+# cuts
+OFFJets, HLTJets, MuonCollections = ApplyBasicCuts(OFFJets, HLTJets, MuonCollections)
+OFFJets, HLTJets, MuonCollections = ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict)
+if   triggerpath=="pt105Analysis": HLTpassedJets = OFFJets[HLTJets.pt105|HLTJets.pt105triple]
+elif triggerpath=="pt125Analysis": HLTpassedJets = OFFJets[HLTJets.pt125|HLTJets.pt125triple]
 
-    if analysis!="MjjAnalysis":
-        OFFmjj  = GetMaxMjj(OFFJet) # This is calculating mjj without mjj cut.
-        OFFmjjCut = (OFFmjj>triggerdict["mjj"])
-        OFFJet = OFFJet[OFFmjjCut]
-        HLTmjj = GetMaxMjj(HLTpassedJet)
-        HLTmjjCut = (HLTmjj>triggerdict["mjj"])
-        HLTpassedJet = HLTpassedJet[HLTmjjCut]
-        dEta = GetMaxEta(OFFJet)
+print("Number of events that passed HLT: {}".format(len(HLTpassedJets)))
+print("Number of offline events: {}".format(len(OFFJets)))
 
-    if analysis!="DetaAnalysis": 
-        OFFdEta = GetMaxEta(OFFJet)
-        OFFdeltaEtaCut = (OFFdEta > triggerdict["deta"])
-        OFFJet = OFFJet[OFFdeltaEtaCut]
-        HLTdEta = GetMaxEta(HLTpassedJet)
-        HLTdeltaEtaCut = (HLTdEta > triggerdict["deta"])
-        HLTpassedJet = HLTpassedJet[HLTdeltaEtaCut]
-        mjj  = GetMaxMjj(OFFJet)
-
-    #mjjs    = np.concatenate((mjjs, OFFmjj))
-    #dEtas   = np.concatenate((dEtas, OFFdEta))
-    OFFJets = np.concatenate((OFFJets, OFFJet))
-    HLTpassedJets = np.concatenate((HLTpassedJets, HLTpassedJet))
-
-print("number of HLT passed Jets: {}".format(len(HLTpassedJets)))
-print("number of OFF Jets: {}".format(len(OFFJets)))
-
-# Analysis variable dictionaries (after data processing)
-
+### POSTPROCESSING ###
 if analysis=="LeadJetPtAnalysis":
     vardict = {
         "plotname": "leadpt",
@@ -189,37 +249,29 @@ if analysis=="MjjAnalysis":
 if analysis=="DetaAnalysis":
     vardict = {
         "plotname": "deta",
-        "binsize"  : 0.1,
+        #"binsize"  : 0.1,
+        "binsize"  : 10.0,
         "HLTPassedQuantity": GetMaxEta(HLTpassedJets),
         "OFFJetQuantity": GetMaxEta(OFFJets),
-        "maxbin": 7,
+        "maxbin": 12.0,
         "xlabel": r"Offline $\Delta\eta$",
         "threshold": triggerdict["deta"],
     }
 
 ### EFFICIENCY ###
-binsize = vardict["binsize"] # Actually half of binsize
-bincenter = np.arange(binsize,vardict["maxbin"],2*binsize)
-effs = np.zeros(len(bincenter))
-errmin,errmax = np.zeros(len(bincenter)), np.zeros(len(bincenter))
+effs, yerrmin, yerrmax, bincenters = GetEfficiency(vardict["binsize"], vardict["maxbin"], vardict["HLTPassedQuantity"], vardict["OFFJetQuantity"])
 
-for i in range(len(bincenter)):
-    minlim = bincenter[i] - binsize
-    maxlim = bincenter[i] + binsize
-
-    nHLT = ak.count_nonzero(ak.where((vardict["HLTPassedQuantity"]>=minlim) & (vardict["HLTPassedQuantity"]<maxlim), True, False))
-    nOFF = ak.count_nonzero(ak.where((vardict["OFFJetQuantity"]   >=minlim) & (vardict["OFFJetQuantity"]   <maxlim), True, False))
-    errmin[i],errmax[i] = clopper_pearson_interval(nHLT,nOFF,0.95)
-    if nOFF!=0: effs[i] = nHLT/nOFF
-errmin, errmax = np.nan_to_num(errmin), np.nan_to_num(errmax)
 
 ### PLOTTING ###
-if triggerpath=="pt105Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt105/"
-if triggerpath=="pt125Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt125/"
+# if triggerpath=="pt105Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt105/"
+# if triggerpath=="pt125Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt125/"
+# if triggerpath=="pt105Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/dijet/"
+#pltPath = "/Users/raymondkil/Desktop/vbftrigger/plots/"
+pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/withBasicCuts/"
 plt.style.use(hep.style.CMS)
 plt.figure()
 
-plt.errorbar(bincenter,effs, yerr=[errmin,errmax], marker='o', color="black", label="Efficiency", linestyle='')
+plt.errorbar(bincenters,effs, yerr=[yerrmin,yerrmax], xerr=vardict["binsize"], marker='o', color="black", label="Efficiency", linestyle='')
 plt.xlabel(vardict["xlabel"])
 plt.ylabel("Efficiency")
 plt.ylim(-0.06,1.2)
@@ -235,9 +287,9 @@ if analysis!="DetaAnalysis":         plt.text(0,0.8,"detacut: {}".format(trigger
 
 plt.legend(loc=2)
 plt.grid()
-if TightCuts: 
+if TightCuts:
     plt.savefig("{0}{1}{2}TightEff.png".format(pltPath,datasetname,vardict["plotname"]))
     print("Plots made! Name: {0}{1}{2}TightEff.png".format(pltPath,datasetname,vardict["plotname"]))
-else:           
+else:
     plt.savefig("{0}{1}{2}Eff.png".format(pltPath,datasetname,vardict["plotname"]))
     print("Plots made! Name: {0}{1}{2}Eff.png".format(pltPath,datasetname,vardict["plotname"]))
