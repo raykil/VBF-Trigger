@@ -8,110 +8,7 @@ import os
 from optparse import OptionParser
 parser = OptionParser(usage="%prog [options]")
 from scipy.stats import beta
-
-### FUNCTION DEFINITION ###
-def GetMaxMjj(Jets):
-    jetcombo = ak.combinations(Jets,2, fields=["jet1","jet2"])
-    jjsum  = jetcombo.jet1 + jetcombo.jet2
-    maxmjj   = ak.max(jjsum.mass,axis=1)
-    maxmjjindex = ak.Array(ak.to_list(np.expand_dims(ak.argmax(jjsum.mass,axis=1),axis=1)))
-    maxmjjpair = jetcombo[maxmjjindex]
-    return maxmjj, maxmjjpair # Retriving jets: maxmjjpair.jet1 ...
-
-def GetMaxEta(Jets):
-    JetCombo = ak.combinations(Jets,2, fields=["jet1","jet2"])
-    etacombo = vector.Spatial.deltaeta(JetCombo.jet1, JetCombo.jet2)
-    maxeta   = ak.max(abs(etacombo), axis=1)
-    return maxeta
-
-def clopper_pearson_interval(hltPassed, total, alpha):
-    min, max = beta.ppf(alpha, hltPassed, total - hltPassed + 1), beta.ppf(1 - alpha, hltPassed + 1, total - hltPassed)
-    center = 0
-    if total !=0: center = hltPassed/total
-    min, max = center-min , max-center
-    return min, max
-
-def DoCuts(OFFJets, HLTJets, MuonCollections, cut):
-    OFFJets = OFFJets[cut]
-    HLTJets = HLTJets[cut]
-    MuonCollections = MuonCollections[cut]
-    return OFFJets, HLTJets, MuonCollections
-
-def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections):
-    print("number of events before BasicCuts: {}".format(len(OFFJets)))
-    
-    nJetCut = (ak.num(OFFJets)>=2)
-    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, nJetCut)
-    print("number of events after nJetCut: {}".format(len(OFFJets)))
-
-    MuonPtCut = (ak.any(MuonCollections.Muon_pt>=27 & MuonCollections.muRelIso<0.2, axis=1))
-    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, MuonPtCut)
-    print("number of events after MuonPtCut: {}".format(len(OFFJets)))
-
-    IsoMu24Cut = HLTJets.IsoMu24
-    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, IsoMu24Cut)
-    print("number of events after IsoMu24Cut: {}".format(len(OFFJets)))
-
-    # This cut is now passing an event if it has at least one (reasonably, i.e., muRelIso<0.2) isolated muon 
-    """
-    RelIso04Cut = (ak.any(MuonCollections.muRelIso<0.2, axis=1))
-    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, RelIso04Cut)
-    print("number of events after RelIso04Cut: {}".format(len(OFFJets)))
-    """
-    return OFFJets, HLTJets, MuonCollections
-
-def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict):
-    print("number of events before TriggerCuts: {}".format(len(OFFJets)))
-
-    # single jet criteria
-    if analysis!="LeadJetPtAnalysis":
-        leadptCut = (OFFJets.pt[:,0]>=triggerdict["leadjetpt"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, leadptCut)
-        print("number of events after leadptCut: {}".format(len(OFFJets)))
-
-    if analysis!="SubleadJetPtAnalysis":
-        subleadptCut = (OFFJets.pt[:,1]>triggerdict["subleadjetpt"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, subleadptCut)
-        print("number of events after subleadptCut: {}".format(len(OFFJets)))
-
-# the jets that produces the maxmjj should pass the leadptCut and subleadptCut
-
-
-    # dijet criteria
-    OFFmjj, maxmjjpair = GetMaxMjj(OFFJets)
-    OFFdEta = ak.flatten(vector.Spatial.deltaeta(maxmjjpair.jet1, maxmjjpair.jet2))
-
-    if analysis!="MjjAnalysis":
-        OFFmjjCut = (OFFmjj >= triggerdict["mjj"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, OFFmjjCut)
-        maxmjjpair = maxmjjpair[OFFmjjCut]
-        OFFdEta = OFFdEta[OFFmjjCut]
-        print("number of events after OFFmjjCut: {}".format(len(OFFJets)))
-
-    if analysis!="DetaAnalysis":
-        OFFdEtaCut = (OFFdEta >= triggerdict["deta"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, OFFdEtaCut)
-        print("number of events after OFFdetaCut: {}".format(len(OFFJets)))
-
-    return OFFJets, HLTJets, MuonCollections
-
-def GetEfficiency(binsize, maxbin, HLTPassedQuantity, OFFJetQuantity):
-    bincenters = np.arange(binsize,maxbin,2*binsize)
-    effs = np.zeros(len(bincenters))
-    errmin,errmax = np.zeros(len(bincenters)), np.zeros(len(bincenters))
-
-    for i in range(len(bincenters)):
-        minlim = round(bincenters[i] - binsize,5)
-        maxlim = round(bincenters[i] + binsize,5)
-
-        nHLT = ak.count_nonzero(ak.where((HLTPassedQuantity>minlim) & (HLTPassedQuantity<=maxlim), 1, 0))
-        nOFF = ak.count_nonzero(ak.where((OFFJetQuantity   >minlim) & (OFFJetQuantity   <=maxlim), 1, 0))
-        print(minlim, maxlim, nHLT, nOFF)
-        errmin[i],errmax[i] = clopper_pearson_interval(nHLT,nOFF,0.05)
-        if nOFF!=0: effs[i] = nHLT/nOFF
-    yerrmin, yerrmax = np.nan_to_num(errmin), np.nan_to_num(errmax)
-
-    return effs, yerrmin, yerrmax, bincenters
+import definitions as vbf
 
 ### PREPROCESSING ###
 parser.add_option("--whichfiles" , dest="whichfiles" , default="singlemuon"       , help="options: singlemuon, zerobias")
@@ -132,7 +29,7 @@ if whichfiles=="singlemuon":
 if whichfiles=="zerobias":
     path = "/eos/user/j/jkil/SUEP/suep-production/summer23data/zerobias/"
     datasetname = "ZeroBias"
-names = os.listdir(path)[:10]
+names = os.listdir(path)[:20]
 #names = [x for x in os.listdir(path) if x != '.DS_Store']
 
 if triggerpath=="pt105Analysis":
@@ -165,52 +62,16 @@ if TightCuts:  # This is where I update the cuts!
 
 
 ### PROCESSING ###
-OFFJets, HLTJets, MuonCollections = [],ak.Array([]), []
-for filename in names:
-    print("Processing file {0}".format(filename))
-    f = uproot.open(path + filename)
-    events = f["Events"]
+OFFJets, HLTJets, MuonCollections = vbf.MakeObjects(names, path)
+OFFJets, HLTJets, MuonCollections = vbf.ApplyBasicCuts(OFFJets, HLTJets, MuonCollections)
+cleanOFFJets, cleanHLTJets, cleanMuonCollections, cleanOFFcombo = vbf.ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict)
+shouldPassHLT_Jets, shouldPassHLT_MaxMjjCombo = vbf.SelectHLTPassedJets(cleanOFFJets, cleanOFFcombo)
 
-    HLTJet = ak.zip({ # Regular array corresponding to events...... Maybe change the name to HLTPath(s) for more intuition
-        "pt105":       events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5"].array(),
-        "pt105triple": events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5_TriplePFJet"].array(),
-        "pt125":       events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0"].array(),
-        "pt125triple": events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0_TriplePFJet"].array(),
-
-        "IsoMu24": events["HLT_IsoMu24"].array(), #[True, True, True, True, True, False, ... False, False, False, True, True, False]]
-    })
-
-    OFFJet = vector.zip({ # Jagged array with subarrays corresponding to jets
-        "pt": events["Jet_pt"].array(),
-        "eta": events["Jet_eta"].array(),
-        "phi": events["Jet_phi"].array(),
-        "mass": events["Jet_mass"].array(),
-
-        "chEmEF": events["Jet_chEmEF"].array(),
-        "chHEF": events["Jet_chHEF"].array(),
-        "neEmEF": events["Jet_neEmEF"].array(),
-        "neHEF": events["Jet_neHEF"].array(),
-        "muEF": events["Jet_muEF"].array(),
-    })
-
-    MuonCollection = ak.zip({ # Jagged array with subarrays corresponding to muons
-        "nMuon": events["nMuon"].array(),
-        "Muon_pt": events["Muon_pt"].array(),
-        "muRelIso": events["Muon_pfRelIso04_all"].array() # relative isolation of muons [[0.0981], [0.0469, 0.362], [0.0085, ... 0.0036], [0.251, 0, 0.254, 0.412, 0.87]]
-    })
-
-    OFFJets = ak.concatenate((OFFJets, OFFJet))
-    HLTJets = ak.concatenate((HLTJets, HLTJet))
-    MuonCollections = ak.concatenate((MuonCollections, MuonCollection))
-
-# cuts
-OFFJets, HLTJets, MuonCollections = ApplyBasicCuts(OFFJets, HLTJets, MuonCollections)
-OFFJets, HLTJets, MuonCollections = ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict)
-if   triggerpath=="pt105Analysis": HLTpassedJets = OFFJets[HLTJets.pt105|HLTJets.pt105triple]
-elif triggerpath=="pt125Analysis": HLTpassedJets = OFFJets[HLTJets.pt125|HLTJets.pt125triple]
+if   triggerpath=="pt105Analysis": HLTpassedJets = shouldPassHLT_Jets[cleanHLTJets.pt105|cleanHLTJets.pt105triple]
+elif triggerpath=="pt125Analysis": HLTpassedJets = shouldPassHLT_Jets[cleanHLTJets.pt125|cleanHLTJets.pt125triple]
 
 print("Number of events that passed HLT: {}".format(len(HLTpassedJets)))
-print("Number of offline events: {}".format(len(OFFJets)))
+print("Number of offline events: {}".format(len(shouldPassHLT_Jets)))
 
 ### POSTPROCESSING ###
 if analysis=="LeadJetPtAnalysis":
@@ -218,7 +79,7 @@ if analysis=="LeadJetPtAnalysis":
         "plotname": "leadpt",
         "binsize"  : 5,
         "HLTPassedQuantity": HLTpassedJets.pt[:,0],
-        "OFFJetQuantity": OFFJets.pt[:,0],
+        "OFFJetQuantity": shouldPassHLT_Jets.pt[:,0],
         "maxbin": 210,
         "xlabel": r"Offline $p_T^{leadjet}$ (GeV)",
         "threshold": triggerdict["leadjetpt"],
@@ -229,7 +90,7 @@ if analysis=="SubleadJetPtAnalysis":
         "plotname": "subleadpt",
         "binsize"  : 2,
         "HLTPassedQuantity": HLTpassedJets.pt[:,1],
-        "OFFJetQuantity": OFFJets.pt[:,1],
+        "OFFJetQuantity": shouldPassHLT_Jets.pt[:,1],
         "maxbin": 100,
         "xlabel": r"Offline $p_T^{subleadjet}$ (GeV)",
         "threshold": triggerdict["subleadjetpt"],
@@ -239,8 +100,8 @@ if analysis=="MjjAnalysis":
     vardict = {
         "plotname": "mjj",
         "binsize"  : 50,
-        "HLTPassedQuantity": GetMaxMjj(HLTpassedJets),
-        "OFFJetQuantity": GetMaxMjj(OFFJets),
+        "HLTPassedQuantity": vbf.GetMaxMjj(HLTpassedJets),
+        "OFFJetQuantity": vbf.GetMaxMjj(shouldPassHLT_Jets),
         "maxbin": 2000,
         "xlabel": r"Offline $M_{jj}$ (GeV)",
         "threshold": triggerdict["mjj"],
@@ -249,27 +110,137 @@ if analysis=="MjjAnalysis":
 if analysis=="DetaAnalysis":
     vardict = {
         "plotname": "deta",
-        #"binsize"  : 0.1,
-        "binsize"  : 10.0,
-        "HLTPassedQuantity": GetMaxEta(HLTpassedJets),
-        "OFFJetQuantity": GetMaxEta(OFFJets),
-        "maxbin": 12.0,
+        "binsize"  : 0.1,
+        "HLTPassedQuantity": vbf.GetMaxEta(HLTpassedJets),
+        "OFFJetQuantity": vbf.GetMaxEta(shouldPassHLT_Jets),
+        "maxbin": 7,
         "xlabel": r"Offline $\Delta\eta$",
         "threshold": triggerdict["deta"],
     }
 
+# JetID analysis requires jet-wise efficiency calculation...in progress
+# Need more attention from this point on!
+
+# leadjet
+if analysis=="LeadJetchEmEFAnalysis":
+    vardict = {
+        "plotname": "LeadJetchEmEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.chEmEF[:,0],
+        "OFFJetQuantity": shouldPassHLT_Jets.chEmEF[:,0],
+        "maxbin": 1.0,
+        "xlabel": "Leadjet chEmEF",
+        "threshold": -999,
+    }
+
+if analysis=="LeadJetchHEFAnalysis":
+    vardict = {
+        "plotname": "LeadJetchHEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.chHEF[:,0],
+        "OFFJetQuantity": shouldPassHLT_Jets.chHEF[:,0],
+        "maxbin": 1.0, # Should make bin to exceed 1, because in eff calc, I am binning the events so that quantity < maxbin, which does not include 1, while there are events with EF==1.
+        "xlabel": "Leadjet chHEF",
+        "threshold": -999,
+    }
+
+if analysis=="LeadJetneEmEFAnalysis":
+    vardict = {
+        "plotname": "LeadJetneEmEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.neEmEF[:,0],
+        "OFFJetQuantity": shouldPassHLT_Jets.neEmEF[:,0],
+        "maxbin": 1.0,
+        "xlabel": "Leadjet neEmEF",
+        "threshold": -999,
+    }
+
+if analysis=="LeadJetneHEFAnalysis":
+    vardict = {
+        "plotname": "LeadJetneHEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.neHEF[:,0],
+        "OFFJetQuantity": shouldPassHLT_Jets.neHEF[:,0],
+        "maxbin": 1.0,
+        "xlabel": "Leadjet neHEF",
+        "threshold": -999,
+    }
+
+if analysis=="LeadJetmuEFAnalysis":
+    vardict = {
+        "plotname": "LeadJetmuEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.muEF[:,0],
+        "OFFJetQuantity": shouldPassHLT_Jets.muEF[:,0],
+        "maxbin": 1.0,
+        "xlabel": "Leadjet muEF",
+        "threshold": -999,
+    }
+
+#subleadjet 
+if analysis=="SubLeadJetchEmEFAnalysis":
+    vardict = {
+        "plotname": "SubLeadJetchEmEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.chEmEF[:,1],
+        "OFFJetQuantity": shouldPassHLT_Jets.chEmEF[:,1],
+        "maxbin": 1.0,
+        "xlabel": "SubLeadJet chEmEF",
+        "threshold": -999,
+    }
+
+if analysis=="SubLeadJetchHEFAnalysis":
+    vardict = {
+        "plotname": "SubLeadJetchHEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.chHEF[:,1],
+        "OFFJetQuantity": shouldPassHLT_Jets.chHEF[:,1],
+        "maxbin": 1.0, # Should make bin to exceed 1, because in eff calc, I am binning the events so that quantity < maxbin, which does not include 1, while there are events with EF==1.
+        "xlabel": "SubLeadJet chHEF",
+        "threshold": -999,
+    }
+
+if analysis=="SubLeadJetneEmEFAnalysis":
+    vardict = {
+        "plotname": "SubLeadJetneEmEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.neEmEF[:,1],
+        "OFFJetQuantity": shouldPassHLT_Jets.neEmEF[:,1],
+        "maxbin": 1.0,
+        "xlabel": "SubLeadJet neEmEF",
+        "threshold": -999,
+    }
+
+if analysis=="SubLeadJetneHEFAnalysis":
+    vardict = {
+        "plotname": "SubLeadJetneHEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.neHEF[:,1],
+        "OFFJetQuantity": shouldPassHLT_Jets.neHEF[:,1],
+        "maxbin": 1.0,
+        "xlabel": "SubLeadJet neHEF",
+        "threshold": -999,
+    }
+
+if analysis=="SubLeadJetmuEFAnalysis":
+    vardict = {
+        "plotname": "SubLeadJetmuEF",
+        "binsize"  : 0.05,
+        "HLTPassedQuantity": HLTpassedJets.muEF[:,1],
+        "OFFJetQuantity": shouldPassHLT_Jets.muEF[:,1],
+        "maxbin": 1.0,
+        "xlabel": "SubLeadJet muEF",
+        "threshold": -999,
+    }
+
 ### EFFICIENCY ###
-effs, yerrmin, yerrmax, bincenters = GetEfficiency(vardict["binsize"], vardict["maxbin"], vardict["HLTPassedQuantity"], vardict["OFFJetQuantity"])
+effs, yerrmin, yerrmax, bincenters = vbf.GetEfficiency(vardict["binsize"], vardict["maxbin"], vardict["HLTPassedQuantity"], vardict["OFFJetQuantity"])
 
 
 ### PLOTTING ###
-# if triggerpath=="pt105Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt105/"
-# if triggerpath=="pt125Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/pt125/"
-# if triggerpath=="pt105Analysis": pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/dijet/"
-#pltPath = "/Users/raymondkil/Desktop/vbftrigger/plots/"
-pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/withBasicCuts/"
+pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/comboAnalysis/"
 plt.style.use(hep.style.CMS)
-plt.figure()
+fig = plt.figure()
 
 plt.errorbar(bincenters,effs, yerr=[yerrmin,yerrmax], xerr=vardict["binsize"], marker='o', color="black", label="Efficiency", linestyle='')
 plt.xlabel(vardict["xlabel"])
@@ -277,13 +248,14 @@ plt.ylabel("Efficiency")
 plt.ylim(-0.06,1.2)
 hep.cms.text("Preliminary")
 hep.cms.lumitext(r"Summer23 (L=1.01 fb$^{-1}$)")
-plt.axvline(x=vardict["threshold"], color='tab:red', label="Threshold", linestyle="--")
+if analysis in ["LeadJetPtAnalysis", "SubleadJetPtAnalysis", "MjjAnalysis", "DetaAnalysis"]:
+    plt.axvline(x=vardict["threshold"], color='tab:red', label="Threshold", linestyle="--")
 
 plt.text(0,1.0,"dataset: {}".format(datasetname), size='x-small', color='steelblue')
-if analysis!="LeadJetPtAnalysis":    plt.text(0,0.95,"leadptcut: {}".format(triggerdict["leadjetpt"]), size='x-small', color='steelblue')
-if analysis!="SubleadJetPtAnalysis": plt.text(0,0.9,"subleadptcut: {}".format(triggerdict["subleadjetpt"]), size='x-small', color='steelblue')
-if analysis!="MjjAnalysis":          plt.text(0,0.85,"mjjcut: {}".format(triggerdict["mjj"]), size='x-small', color='steelblue')
-if analysis!="DetaAnalysis":         plt.text(0,0.8,"detacut: {}".format(triggerdict["deta"]), size='x-small', color='steelblue')
+if analysis!="LeadJetPtAnalysis":    plt.text(0.2, 0.65, "leadptcut: {}".format(triggerdict["leadjetpt"])      , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+if analysis!="SubleadJetPtAnalysis": plt.text(0.2, 0.6 , "subleadptcut: {}".format(triggerdict["subleadjetpt"]), ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+if analysis!="MjjAnalysis":          plt.text(0.2, 0.55, "mjjcut: {}".format(triggerdict["mjj"])               , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+if analysis!="DetaAnalysis":         plt.text(0.2, 0.5 , "detacut: {}".format(triggerdict["deta"])             , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
 
 plt.legend(loc=2)
 plt.grid()
