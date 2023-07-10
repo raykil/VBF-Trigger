@@ -31,8 +31,62 @@ def DoCuts(OFFJets, HLTJets, MuonCollections, cut):
     MuonCollections = MuonCollections[cut]
     return OFFJets, HLTJets, MuonCollections
 
+"""
 def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections):
     print("number of events before BasicCuts: {}".format(len(OFFJets)))
+
+    # This cut is made on jet level. So no events are lost. Don't have to cut HLTJets and MuonCollections.
+    print("number of jets before JetIDCuts: {}".format(ak.sum(ak.num(OFFJets))))
+    JetIDCuts = (0.99 > OFFJets.chEmEF) & (0.2 < OFFJets.chHEF) & (0.99 > OFFJets.neEmEF) & (0.9 > OFFJets.neHEF)
+    OFFJets = OFFJets[JetIDCuts]
+    print("number of jets after JetIDCuts: {}".format(ak.sum(ak.num(OFFJets))))
+    
+    nJetCut = (ak.num(OFFJets)>=2)
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, nJetCut)
+    print("number of events after nJetCut: {}".format(len(OFFJets)))
+
+    # This cut is now passing an event if it has at least one (reasonably, i.e., muRelIso<0.2) isolated muon 
+    MuonCuts = (ak.any((MuonCollections.Muon_pt>=27) & (MuonCollections.muRelIso<0.2), axis=1))
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, MuonCuts)
+    print("number of events after MuonCuts: {}".format(len(OFFJets)))
+
+    IsoMu24Cut = HLTJets.IsoMu24
+    OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, IsoMu24Cut)
+    print("number of events after IsoMu24Cut: {}".format(len(OFFJets)))
+
+    return OFFJets, HLTJets, MuonCollections
+"""
+
+def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, analysis):
+    print("number of events before BasicCuts: {}".format(len(OFFJets)))
+
+    # This cut is made on jet level. So no events are lost. Don't have to cut HLTJets and MuonCollections.
+    """
+    print("number of jets before JetIDCuts: {}".format(ak.sum(ak.num(OFFJets))))
+    JetIDCuts = (0.99 > OFFJets.chEmEF) & (0.2 < OFFJets.chHEF) & (0.99 > OFFJets.neEmEF) & (0.9 > OFFJets.neHEF)
+    OFFJets = OFFJets[JetIDCuts]
+    print("number of jets after JetIDCuts: {}".format(ak.sum(ak.num(OFFJets))))
+    """
+
+    if (analysis!="LeadJetchEmEFAnalysis") and (analysis!="SubLeadJetchEmEFAnalysis"):
+        chEmEFCut = (0.99 > OFFJets.chEmEF)
+        OFFJets = OFFJets[chEmEFCut]
+        print("number of jets after chEmEFCut: {}".format(ak.sum(ak.num(OFFJets))))
+
+    if (analysis!="LeadJetchHEFAnalysis") and (analysis!="SubLeadJetchHEFAnalysis"):
+        chHEFCut = (0.2 < OFFJets.chHEF)
+        OFFJets = OFFJets[chHEFCut]
+        print("number of jets after chHEFCut: {}".format(ak.sum(ak.num(OFFJets))))
+
+    if (analysis!="LeadJetneEmEFAnalysis") and (analysis!="SubLeadJetneEmEFAnalysis"):
+        neEmEFCut = (0.99 > OFFJets.neEmEF)
+        OFFJets = OFFJets[neEmEFCut]
+        print("number of jets after neEmEFCut: {}".format(ak.sum(ak.num(OFFJets))))
+
+    if (analysis!="LeadJetneHEFAnalysis") and (analysis!="LeadJetneHEFAnalysis"):
+        neHEFCut = (0.9 > OFFJets.neHEF)
+        OFFJets = OFFJets[neHEFCut]
+        print("number of jets after neHEFCut: {}".format(ak.sum(ak.num(OFFJets))))
     
     nJetCut = (ak.num(OFFJets)>=2)
     OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, nJetCut)
@@ -49,67 +103,29 @@ def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections):
 
     return OFFJets, HLTJets, MuonCollections
 
-"""
-def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict):
-    print("number of events before TriggerCuts: {}".format(len(OFFJets)))
-
-    # single jet criteria
-    if analysis!="LeadJetPtAnalysis":
-        leadptCut = (OFFJets.pt[:,0]>=triggerdict["leadjetpt"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, leadptCut)
-        print("number of events after leadptCut: {}".format(len(OFFJets)))
-
-    if analysis!="SubleadJetPtAnalysis":
-        subleadptCut = (OFFJets.pt[:,1]>triggerdict["subleadjetpt"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, subleadptCut)
-        print("number of events after subleadptCut: {}".format(len(OFFJets)))
-
-    OFFmjj, maxmjjpair = GetMaxMjj(OFFJets)
-    OFFdEta = ak.flatten(vector.Spatial.deltaeta(maxmjjpair.jet1, maxmjjpair.jet2))
-
-    if analysis!="MjjAnalysis":
-        OFFmjjCut = (OFFmjj >= triggerdict["mjj"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, OFFmjjCut)
-        maxmjjpair = maxmjjpair[OFFmjjCut]
-        OFFdEta = OFFdEta[OFFmjjCut]
-        print("number of events after OFFmjjCut: {}".format(len(OFFJets)))
-
-    if analysis!="DetaAnalysis":
-        OFFdEtaCut = (OFFdEta >= triggerdict["deta"])
-        OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, OFFdEtaCut)
-        print("number of events after OFFdetaCut: {}".format(len(OFFJets)))
-
-    return OFFJets, HLTJets, MuonCollections
-"""
-
 def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict):
     OFFcombo = ak.combinations(OFFJets,2, fields=["jet1","jet2"])
-    #print("number of events before cuts: ", ak.count_nonzero(OFFcombo))
     print("number of jet pairs before cuts: ", ak.count_nonzero(OFFcombo.jet1.pt))
 
     if analysis!="LeadJetPtAnalysis":
         leadjetptcut = (OFFcombo.jet1.pt>=triggerdict["leadjetpt"])
         OFFcombo = OFFcombo[leadjetptcut]
-        #print("number of events after leadjetptcut: ", ak.count_nonzero(OFFcombo))
         print("number of jet pairs after leadjetptcut: ", ak.count_nonzero(OFFcombo.jet1.pt))
 
     if analysis!="SubleadJetPtAnalysis":
         subleadjetptcut = (OFFcombo.jet2.pt>=triggerdict["subleadjetpt"])
         OFFcombo = OFFcombo[subleadjetptcut]
-        #print("number of events after subleadjetptcut: ", ak.count_nonzero(OFFcombo))
         print("number of jet pairs after subleadjetptcut: ", ak.count_nonzero(OFFcombo.jet1.pt))
 
     if analysis!="MjjAnalysis":
         jjsum  = OFFcombo.jet1 + OFFcombo.jet2
         mjjcut = (jjsum.mass>=triggerdict["mjj"])
         OFFcombo = OFFcombo[mjjcut]
-        #print("number of events after mjjcut: ", ak.count_nonzero(OFFcombo))
         print("number of jet pairs after mjjcut: ", ak.count_nonzero(OFFcombo.jet1.pt))
 
     if analysis!="DetaAnalysis":
         detacut = (vector.Spatial.deltaeta(OFFcombo.jet1, OFFcombo.jet2) >= triggerdict["deta"])
         OFFcombo = OFFcombo[detacut]
-        #print("number of events after detacut: ", ak.count_nonzero(OFFcombo))
         print("number of jet pairs after detacut: ", ak.count_nonzero(OFFcombo.jet1.pt))
 
     eventcut = ak.where(ak.num(OFFcombo)>0,True, False)
@@ -154,42 +170,40 @@ def MakeObjects(filenames,path):
     OFFJets, HLTJets, MuonCollections = [],ak.Array([]), []
     for filename in filenames:
         print("Processing file {0}".format(filename))
-        f = uproot.open(path + filename)
-        events = f["Events"]
+        with uproot.open(path + filename) as f:
+            events = f["Events"]
 
-        HLTJet = ak.zip({ # Regular array corresponding to events...... Maybe change the name to HLTPath(s) for more intuition
-            "pt105":       events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5"].array(),
-            "pt105triple": events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5_TriplePFJet"].array(),
-            "pt125":       events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0"].array(),
-            "pt125triple": events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0_TriplePFJet"].array(),
+            HLTJet = ak.zip({ # Regular array corresponding to events...... Maybe change the name to HLTPath(s) for more intuition
+                "pt105":       events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5"].array(),
+                "pt105triple": events["HLT_VBF_DiPFJet105_40_Mjj1000_Detajj3p5_TriplePFJet"].array(),
+                "pt125":       events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0"].array(),
+                "pt125triple": events["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0_TriplePFJet"].array(),
 
-            "IsoMu24": events["HLT_IsoMu24"].array(),
-        })
+                "IsoMu24": events["HLT_IsoMu24"].array(),
+            })
 
-        OFFJet = vector.zip({ # Jagged array with subarrays corresponding to jets
-            "pt": events["Jet_pt"].array(),
-            "eta": events["Jet_eta"].array(),
-            "phi": events["Jet_phi"].array(),
-            "mass": events["Jet_mass"].array(),
-            "nTracks": events["Jet_nConstituents"].array(),
+            OFFJet = vector.zip({ # Jagged array with subarrays corresponding to jets
+                "pt": events["Jet_pt"].array(),
+                "eta": events["Jet_eta"].array(),
+                "phi": events["Jet_phi"].array(),
+                "mass": events["Jet_mass"].array(),
+                "nTracks": events["Jet_nConstituents"].array(),
 
-            "chEmEF": events["Jet_chEmEF"].array(),
-            "chHEF": events["Jet_chHEF"].array(),
-            "neEmEF": events["Jet_neEmEF"].array(),
-            "neHEF": events["Jet_neHEF"].array(),
-            "muEF": events["Jet_muEF"].array(),
-        })
+                "chEmEF": events["Jet_chEmEF"].array(),
+                "chHEF": events["Jet_chHEF"].array(),
+                "neEmEF": events["Jet_neEmEF"].array(),
+                "neHEF": events["Jet_neHEF"].array(),
+                "muEF": events["Jet_muEF"].array(),
+            })
 
-        MuonCollection = ak.zip({ # Jagged array with subarrays corresponding to muons
-            "nMuon": events["nMuon"].array(),
-            "Muon_pt": events["Muon_pt"].array(),
-            "muRelIso": events["Muon_pfRelIso04_all"].array() # relative isolation of muons
-        })
-
+            MuonCollection = ak.zip({ # Jagged array with subarrays corresponding to muons
+                "nMuon": events["nMuon"].array(),
+                "Muon_pt": events["Muon_pt"].array(),
+                "muRelIso": events["Muon_pfRelIso04_all"].array() # relative isolation of muons
+            })
         OFFJets = ak.concatenate((OFFJets, OFFJet))
         HLTJets = ak.concatenate((HLTJets, HLTJet))
         MuonCollections = ak.concatenate((MuonCollections, MuonCollection))
-
     return OFFJets, HLTJets, MuonCollections
 
 def GetEfficiency(binsize, maxbin, HLTPassedQuantity, OFFJetQuantity):
