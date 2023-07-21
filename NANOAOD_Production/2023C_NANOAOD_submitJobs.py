@@ -8,7 +8,7 @@ Currently, the program targets the creation of NANOAOD files corresponding to MI
 The datasets are found here: https://cmsweb.cern.ch/das/
 For more information on HTCondor, visit https://htcondor.readthedocs.io/en/latest/index.html.
 Raymond Kil, 2023
-""" 
+"""
 
 import numpy as np
 import os
