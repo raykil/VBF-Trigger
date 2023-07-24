@@ -57,7 +57,7 @@ def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections):
     return OFFJets, HLTJets, MuonCollections
 """
 
-def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, analysis):
+def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, analysis, triggerdict):
     print("number of events before BasicCuts: {}".format(len(OFFJets)))
 
     # This cut is made on jet level. So no events are lost. Don't have to cut HLTJets and MuonCollections.
@@ -69,41 +69,44 @@ def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, analysis):
     """
 
     if (analysis!="LeadJetchEmEFAnalysis") and (analysis!="SubLeadJetchEmEFAnalysis"):
-        chEmEFCut = (0.99 > OFFJets.chEmEF)
+        chEmEFCut = (triggerdict["chEmEF"] > OFFJets.chEmEF)
         OFFJets = OFFJets[chEmEFCut]
         print("number of jets after chEmEFCut: {}".format(ak.sum(ak.num(OFFJets))))
 
     if (analysis!="LeadJetchHEFAnalysis") and (analysis!="SubLeadJetchHEFAnalysis"):
-        chHEFCut = (0.2 < OFFJets.chHEF)
+        chHEFCut = (triggerdict["chHEF"] < OFFJets.chHEF)
         OFFJets = OFFJets[chHEFCut]
         print("number of jets after chHEFCut: {}".format(ak.sum(ak.num(OFFJets))))
 
     if (analysis!="LeadJetneEmEFAnalysis") and (analysis!="SubLeadJetneEmEFAnalysis"):
-        neEmEFCut = (0.99 > OFFJets.neEmEF)
+        neEmEFCut = (triggerdict["neEmEF"] > OFFJets.neEmEF)
         OFFJets = OFFJets[neEmEFCut]
         print("number of jets after neEmEFCut: {}".format(ak.sum(ak.num(OFFJets))))
 
     if (analysis!="LeadJetneHEFAnalysis") and (analysis!="LeadJetneHEFAnalysis"):
-        neHEFCut = (0.9 > OFFJets.neHEF)
+        neHEFCut = (triggerdict["neHEF"] > OFFJets.neHEF)
         OFFJets = OFFJets[neHEFCut]
         print("number of jets after neHEFCut: {}".format(ak.sum(ak.num(OFFJets))))
     
     nJetCut = (ak.num(OFFJets)>=2)
     OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, nJetCut)
+    TrigObjs = TrigObjs[nJetCut]
     print("number of events after nJetCut: {}".format(len(OFFJets)))
 
     # This cut is now passing an event if it has at least one (reasonably, i.e., muRelIso<0.2) isolated muon 
     MuonCuts = (ak.any((MuonCollections.Muon_pt>=27) & (MuonCollections.muRelIso<0.2), axis=1))
     OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, MuonCuts)
+    TrigObjs = TrigObjs[MuonCuts]
     print("number of events after MuonCuts: {}".format(len(OFFJets)))
 
     IsoMu24Cut = HLTJets.IsoMu24
     OFFJets, HLTJets, MuonCollections = DoCuts(OFFJets, HLTJets, MuonCollections, IsoMu24Cut)
+    TrigObjs = TrigObjs[IsoMu24Cut]
     print("number of events after IsoMu24Cut: {}".format(len(OFFJets)))
 
-    return OFFJets, HLTJets, MuonCollections
+    return OFFJets, HLTJets, MuonCollections, TrigObjs
 
-def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict):
+def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, analysis, triggerdict):
     OFFcombo = ak.combinations(OFFJets,2, fields=["jet1","jet2"])
     print("number of jet pairs before cuts: ", ak.count_nonzero(OFFcombo.jet1.pt))
 
@@ -133,9 +136,10 @@ def ApplyTriggerCuts(OFFJets, HLTJets, MuonCollections, analysis, triggerdict):
     OFFJets = OFFJets[eventcut]
     HLTJets = HLTJets[eventcut]
     MuonCollections = MuonCollections[eventcut] # Do we need this?
+    TrigObjs = TrigObjs[eventcut]
     print("number of survived events: ", len(OFFJets))
 
-    return OFFJets, HLTJets, MuonCollections, OFFcombo
+    return OFFJets, HLTJets, MuonCollections, TrigObjs, OFFcombo
 
 def SelectHLTPassedJets(Jets, OFFcombo): # OFFcombo from ApplyTriggerCuts!!!
     exp_OFFcombo_jet1, exp_OFFJets_pt = ak.broadcast_arrays(OFFcombo.jet1, Jets.pt[:,np.newaxis], depth_limit=2)
@@ -156,18 +160,18 @@ def SelectHLTPassedJets(Jets, OFFcombo): # OFFcombo from ApplyTriggerCuts!!!
 
     jetmask = (swapped_jet1mask)|(swapped_jet2mask)
     jetmask = jetmask[cutbool]
-    HLTPassedJets = Jets[jetmask]
+    shouldPassHLT_Jets = Jets[jetmask]
 
     # for events that have multiple jet pairs that pass HLT trigger path, I'm now selecting the jet pair that creates maxmjj.
     j1, j2 = OFFcombo.jet1, OFFcombo.jet2
     jj = j1+j2
     argmaxmjj = ak.Array(ak.to_list(np.expand_dims(ak.argmax(jj.mass, axis=1),axis=1)))
-    HLTPassed_MaxMjjCombo = OFFcombo[argmaxmjj]
+    shouldPassHLT_MaxMjjCombo = OFFcombo[argmaxmjj]
 
-    return HLTPassedJets, HLTPassed_MaxMjjCombo # retrieving maxmjjcombo: maxmjjcombo.jet1 gives leadjet, maxmjjcombo.jet2 gives subleadjet
+    return shouldPassHLT_Jets, shouldPassHLT_MaxMjjCombo # retrieving maxmjjcombo: maxmjjcombo.jet1 gives leadjet, maxmjjcombo.jet2 gives subleadjet
 
 def MakeObjects(filenames,path):
-    OFFJets, HLTJets, MuonCollections = [],ak.Array([]), []
+    OFFJets, HLTJets, MuonCollections, TrigObjs = [],ak.Array([]), [], []
     for filename in filenames:
         print("Processing file {0}".format(filename))
         with uproot.open(path + filename) as f:
@@ -201,10 +205,21 @@ def MakeObjects(filenames,path):
                 "Muon_pt": events["Muon_pt"].array(),
                 "muRelIso": events["Muon_pfRelIso04_all"].array() # relative isolation of muons
             })
+
+            TrigObj = ak.zip({
+                "id": events["TrigObj_id"].array(),
+                "filterBits": events["TrigObj_filterBits"].array(),
+                "pt": events["TrigObj_pt"].array(),
+                "eta": events["TrigObj_eta"].array(),
+                "phi": events["TrigObj_phi"].array(),
+                "nObj": events["nTrigObj"].array(),
+            })
+
         OFFJets = ak.concatenate((OFFJets, OFFJet))
         HLTJets = ak.concatenate((HLTJets, HLTJet))
         MuonCollections = ak.concatenate((MuonCollections, MuonCollection))
-    return OFFJets, HLTJets, MuonCollections
+        TrigObjs = ak.concatenate((TrigObjs, TrigObj))
+    return OFFJets, HLTJets, MuonCollections, TrigObjs
 
 def GetEfficiency(binsize, maxbin, HLTPassedQuantity, OFFJetQuantity):
     bincenters = np.arange(binsize,maxbin,2*binsize)
@@ -215,10 +230,66 @@ def GetEfficiency(binsize, maxbin, HLTPassedQuantity, OFFJetQuantity):
         minlim = round(bincenters[i] - binsize,5)
         maxlim = round(bincenters[i] + binsize,5)
 
-        nHLT = ak.count_nonzero(ak.where((HLTPassedQuantity>minlim) & (HLTPassedQuantity<=maxlim), 1, 0))
-        nOFF = ak.count_nonzero(ak.where((OFFJetQuantity   >minlim) & (OFFJetQuantity   <=maxlim), 1, 0))
+        nHLT = ak.count_nonzero(ak.where((HLTPassedQuantity>=minlim) & (HLTPassedQuantity<=maxlim), 1, 0))
+        nOFF = ak.count_nonzero(ak.where((OFFJetQuantity   >=minlim) & (OFFJetQuantity   <=maxlim), 1, 0))
         errmin[i],errmax[i] = clopper_pearson_interval(nHLT,nOFF,0.05)
         if nOFF!=0: effs[i] = nHLT/nOFF
     yerrmin, yerrmax = np.nan_to_num(errmin), np.nan_to_num(errmax)
 
     return effs, yerrmin, yerrmax, bincenters
+
+def AssignFilterBitsToOFFJets(TrigObjs, OFFJets):
+    # This function matches which jets in the TrigObj match the OFFJets, and assigns the masking value to OFFJets.
+    # the input TrigObjs and OFFJets might have previous cuts or not. Just in case it's raw, reapply the cuts here.
+    # just to make sure that 1) we are only dealing with jet objects in TrigObjs, and 2) we are discarding the events where there are no jets in TrigObjs.
+    
+    # select jets from TrigObjs
+    PickJetsCut = ak.where(TrigObjs.id==1, True, False) # this cut is jetwise -> only apply to TrigObjs
+    TrigObjs = TrigObjs[PickJetsCut]
+
+    # selecting jets that pass HLT VBF filterBits. 
+    # All OFFJets that do NOT match with the TrigObj jets will be assigned False.
+    rightmostbit = (TrigObjs.filterBits) & (-1*TrigObjs.filterBits)
+    PassHLTVBFfBCut = (rightmostbit==1)|(rightmostbit==2)
+    TrigObjs = TrigObjs[PassHLTVBFfBCut]
+
+    # discarding the events where there are no jets (that pass VBFHLT fB)in TrigObjs
+    ExistTrigObjsCut = ak.where(ak.num(TrigObjs)==0, False, True) # this cut is eventwise -> apply both to TrigObjs and OFFJets
+    TrigObjs = TrigObjs[ExistTrigObjsCut]
+    OFFJets = OFFJets[ExistTrigObjsCut]
+
+
+    #np.set_printoptions(threshold=sys.maxsize, precision=3)
+    #m = -4
+    # taking deltaR for each combination of TrigObjs jets and OFFJets
+    TrigOFFcombo = ak.cartesian({"tri": TrigObjs, "off": OFFJets[:,np.newaxis]})
+    dR = np.sqrt((TrigOFFcombo.tri.eta-TrigOFFcombo.off.eta)**2 + (TrigOFFcombo.tri.phi-TrigOFFcombo.off.phi)**2)
+    #print("dR", np.array(dR[m]))
+
+    # dropping TrigObj jets that do not match with any OFFJets
+    mindR = ak.min(dR,axis=-1)
+    dropTrigObj = ak.where(mindR>0.1,False,True)
+    TrigObjs = TrigObjs[dropTrigObj]
+    dR = dR[dropTrigObj]
+
+    # dropping events where there are no TrigObjs
+    NoTrigObjCut = ak.where(ak.num(TrigObjs)==0,False,True)
+    TrigObjs = TrigObjs[NoTrigObjCut]
+    OFFJets = OFFJets[NoTrigObjCut]
+    dR = dR[NoTrigObjCut]
+
+    # Assigning filterBits to respective OFFJets (Dirty region)
+    mindRindex = ak.argmin(dR,axis=-1)
+    filterBitsToAdd = np.full(np.shape(ak.pad_none(OFFJets.eta,ak.max(ak.num(OFFJets.eta)),axis=-1)),-999)
+    shapePreservation = ak.where(OFFJets.eta,True,True)
+    shapePreservation = ak.fill_none(ak.pad_none(shapePreservation,ak.max(ak.num(shapePreservation)),axis=-1),False,axis=-1)
+    for idx, sub in enumerate(mindRindex):
+        for i,j in enumerate(sub):
+            filterBitsToAdd[idx][j] = TrigObjs.filterBits[idx][i]
+    filterBitsToAdd = ak.Array(filterBitsToAdd)[shapePreservation]
+    JetPassedHLT = ak.where(filterBitsToAdd>0, True, False)
+
+    OFFJets = ak.with_field(OFFJets, filterBitsToAdd ,"filterBits")
+    OFFJets = ak.with_field(OFFJets, JetPassedHLT ,"JetPassedHLT")
+
+    return TrigObjs, OFFJets
