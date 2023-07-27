@@ -1,8 +1,0 @@
-executable = $(filename)
-arguments  = $(ClusterId)$(ProcId)
-output     = /eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/batchlogs/$(ClusterId).$(ProcId).out
-error      = /eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/batchlogs/$(ClusterId).$(ProcId).err
-log        = /eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/batchlogs/$(ClusterId).log
-+JobFlavour = 'tomorrow' 
-
-queue filename matching files ./exec/job*.sh
