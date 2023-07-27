@@ -19,19 +19,22 @@ rootfilenames = []
 with open(txtfilepath + "MuAll_2023C_MINIAOD.txt", 'r') as f:
     for line in f:
         rootfilenames.append(line.strip())
-nCom = 50
+nCom = 100
 slicing = np.arange(0,len(rootfilenames),nCom)
 
 ###### Specifying/Making Directories as Needed ######
 pyDir       = "/eos/user/j/jkil/SUEP/suep-production/test/Run3Summer22EE/ReReco-Run2023_nanoaod.py"
-
 nanoaodDir  = "/eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/NANOAOD/"
-batchlogDir = "/eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/batchlogs/"
-shfilesDir  = "/eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/exec/"
-proxyDir    = "/eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/proxy/"
+eoslogDir   = "/eos/user/j/jkil/SUEP/suep-production/2023C_mu_NANOAOD_withJetFB/eosbatchlogs/"
+batchlogDir = "/afs/cern.ch/user/j/jkil/TEST/batchlogs/"
+shfilesDir  = "/afs/cern.ch/user/j/jkil/TEST/exec/"
+proxyDir    = "/afs/cern.ch/user/j/jkil/TEST/proxy/"
+
+#condorlogDir = "/afs/cern.ch/user/j/jkil/TEST/"
 
 if not os.path.exists(nanoaodDir) : os.system("mkdir {}".format(nanoaodDir))
 if not os.path.exists(batchlogDir): os.system("mkdir {}".format(batchlogDir))
+if not os.path.exists(eoslogDir)  : os.system("mkdir {}".format(eoslogDir))
 if not os.path.exists(shfilesDir) : os.system("mkdir {}".format(shfilesDir))
 if not os.path.exists(proxyDir)   : os.system("mkdir {}".format(proxyDir))
 
@@ -49,7 +52,8 @@ for i, s in enumerate(slicing):
         shf.write("cd -\n")
         shf.write("\n")
         for idx, line in enumerate(batch):
-            shf.write("cmsRun {} inputFiles='{}' outputFile='{}nanoaod_{}.root' &> {}nanoaod_{}.log\n".format(pyDir, line, nanoaodDir, str(i*nCom+idx), batchlogDir, str(i*nCom+idx)))
+            shf.write(f"cmsRun {pyDir} inputFiles='{line}' outputFile='{nanoaodDir}nanoaod_{str(i*nCom+idx)}.root' &> {batchlogDir}nanoaod_{str(i*nCom+idx)}.log\n")
+            shf.write(f"mv {batchlogDir}nanoaod_{str(i*nCom+idx)}.log {eoslogDir}\n")
     os.system("chmod 755 {}job_{}-{}.sh".format(shfilesDir, s, str(s+nCom-1)))
 print("job.sh files created! Number of files: {}".format(len(slicing)))
 
@@ -60,13 +64,13 @@ with open("submit.sub", 'w') as sub:
     sub.write("output     = {}$(ClusterId).$(ProcId).out\n".format(batchlogDir))
     sub.write("error      = {}$(ClusterId).$(ProcId).err\n".format(batchlogDir))
     sub.write("log        = {}$(ClusterId).log\n".format(batchlogDir))
-    sub.write("+JobFlavour = 'tomorrow' \n")
+    sub.write('+JobFlavour = "nextweek" \n')
     sub.write("\n")
-    sub.write("queue filename matching files ./exec/job*.sh")
+    sub.write(f"queue filename matching files {shfilesDir}job*.sh")
 print("submit.sub file created!")
 
 ###### Submitting Jobs ######
-os.system("condor_submit -spool submit.sub")
+os.system("condor_submit submit.sub") # note that submit_jobs should be done in afs, unless it has -spool argument
 print("Congratulations! Jobs are submitted.")
 print("To check the status of the jobs, run the command condor_q.")
 os.system("condor_q")
