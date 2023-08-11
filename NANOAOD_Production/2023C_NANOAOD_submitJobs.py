@@ -30,8 +30,6 @@ batchlogDir = "/afs/cern.ch/user/j/jkil/TEST/batchlogs/"
 shfilesDir  = "/afs/cern.ch/user/j/jkil/TEST/exec/"
 proxyDir    = "/afs/cern.ch/user/j/jkil/TEST/proxy/"
 
-#condorlogDir = "/afs/cern.ch/user/j/jkil/TEST/"
-
 if not os.path.exists(nanoaodDir) : os.system("mkdir {}".format(nanoaodDir))
 if not os.path.exists(batchlogDir): os.system("mkdir {}".format(batchlogDir))
 if not os.path.exists(eoslogDir)  : os.system("mkdir {}".format(eoslogDir))
