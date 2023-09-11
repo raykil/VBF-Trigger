@@ -307,7 +307,7 @@ def GetVardict(HLTPassed_OFFJets, HLTCandJets, analysis, triggerdict, shouldPass
             "binsize"  : 2,
             "HLTPassedQuantity": HLTPassed_OFFJets.pt[:,1],
             "HLTCandQuantity": HLTCandJets.pt[:,1],
-            "maxbin": 130,
+            "maxbin": 150,
             "xlabel": r"Offline $p_T^{subleadjet}$ (GeV)",
             "threshold": triggerdict["subleadjetpt"],
         }
