@@ -1,3 +1,8 @@
+"""
+    This program calculates and plots the efficiency for VBF trigger path.
+    Raymond Kil, 2023
+"""
+
 import awkward as ak
 import vector
 import mplhep as hep
@@ -29,10 +34,10 @@ datapath = options.datapath
 if whichfiles=="singlemuon":
     path = datapath
     datasetname = "SingleMuon"
-    OFFJets = ak.from_parquet(path + "OFFJets*.parquet")
-    HLTJets = ak.from_parquet(path + "HLTJets*.parquet")
-    MuonCollections = ak.from_parquet(path + "MuonCollections*.parquet")
-    TrigObjs = ak.from_parquet(path + "TrigObjs*.parquet")
+    OFFJets = ak.from_parquet(path + "*OFFJets*.parquet")
+    HLTJets = ak.from_parquet(path + "*HLTJets*.parquet")
+    MuonCollections = ak.from_parquet(path + "*MuonCollections*.parquet")
+    TrigObjs = ak.from_parquet(path + "*TrigObjs*.parquet")
     OFFJets = vector.zip({
             "pt": OFFJets.rho,
             "eta": OFFJets.eta,
@@ -46,7 +51,7 @@ if whichfiles=="singlemuon":
             "neHEF": OFFJets.neHEF,
             "muEF": OFFJets.muEF,
         })
-    print("Successfully loaded objects using parquet! Number of events: {0}".format(len(OFFJets)))
+    print(f"Successfully loaded objects using parquet! Number of events: {len(OFFJets)}")
 if whichfiles=="zerobias":
     path = "/eos/user/j/jkil/SUEP/suep-production/summer23data/zerobias/"
     datasetname = "ZeroBias"
@@ -92,12 +97,12 @@ if TightCuts:  # This is where I update the cuts!
 
 basicOFFJets, basicHLTJets, basicMuonCollections, basicTrigObjs = vbf.ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, analysis, triggerdict)
 cleanOFFJets, cleanHLTJets, cleanMuonCollections, cleanTrigObjs, cleanOFFcombo = vbf.ApplyTriggerCuts(basicOFFJets, basicHLTJets, basicMuonCollections, basicTrigObjs, analysis, triggerdict)
-HLTCandJets, HLTCandMaxMjjComo, shouldPassHLT_mjjs, shouldPassHLT_detas = vbf.SelectHLTJetsCand(cleanOFFJets, cleanOFFcombo)
+HLTCandJets, HLTCandMaxMjjCombo, shouldPassHLT_mjjs, shouldPassHLT_detas = vbf.SelectHLTJetsCand(cleanOFFJets, cleanOFFcombo)
 assigned_TrigObjs, assigned_OFFJets, HLTPassed_OFFJets = vbf.AssignFilterBitsToOFFJets(cleanTrigObjs, HLTCandJets, cleanHLTJets, triggerpath)
 
 print("\n")
-print("Number of events that passed HLT: {}".format(len(HLTPassed_OFFJets)))
-print("Number of offline events: {}".format(len(HLTCandJets)))
+print(f"Number of events that passed HLT: {len(HLTPassed_OFFJets)}")
+print(f"Number of offline events: {len(HLTCandJets)}")
 
 ### POSTPROCESSING ###
 vardict = vbf.GetVardict(HLTPassed_OFFJets, HLTCandJets, analysis, triggerdict, shouldPassHLT_mjjs, shouldPassHLT_detas)
@@ -106,7 +111,6 @@ vardict = vbf.GetVardict(HLTPassed_OFFJets, HLTCandJets, analysis, triggerdict, 
 effs, yerrmin, yerrmax, bincenters = vbf.GetEfficiency(vardict["binsize"], vardict["maxbin"], vardict["HLTPassedQuantity"], vardict["HLTCandQuantity"])
 
 ### PLOTTING ###
-#pltPath = "/eos/user/j/jkil/www/VBFSUEP/efficiency/combo_allfiles/"
 pltPath = outputdir
 plt.style.use(hep.style.CMS)
 fig = plt.figure()
@@ -116,16 +120,26 @@ plt.xlabel(vardict["xlabel"])
 plt.ylabel("Efficiency")
 plt.ylim(-0.06,1.2)
 hep.cms.text("Preliminary")
-hep.cms.lumitext(r"Summer23 (L=1.01 fb$^{-1}$)")
+hep.cms.lumitext(r"Summer23 (L=12.98 fb$^{-1}$)")
 if analysis in ["LeadJetPtAnalysis", "SubleadJetPtAnalysis", "MjjAnalysis", "DetaAnalysis"]:
     plt.axvline(x=vardict["threshold"], color='tab:red', label="Threshold", linestyle="--")
 
-plt.text(0,1.0,"dataset: {}".format(datasetname), size='x-small', color='steelblue')
-plt.text(0.2, 0.75,r"$\geq 1$ tight $\mu$ ($p_T\geq 27$ GeV), pass HLT_IsoMu24", ha='left', va='top', size='x-small', color='red', transform=fig.transFigure)
-if analysis!="LeadJetPtAnalysis":    plt.text(0.2, 0.65, "leadptcut: {}".format(triggerdict["leadjetpt"])      , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
-if analysis!="SubleadJetPtAnalysis": plt.text(0.2, 0.6 , "subleadptcut: {}".format(triggerdict["subleadjetpt"]), ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
-if analysis!="MjjAnalysis":          plt.text(0.2, 0.55, "mjjcut: {}".format(triggerdict["mjj"])               , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
-if analysis!="DetaAnalysis":         plt.text(0.2, 0.5 , "detacut: {}".format(triggerdict["deta"])             , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+#plt.text(0,1.0,"dataset: {}".format(datasetname), size='x-small', color='steelblue')
+plt.text(0.2, 0.7,r"$\geq 1$ tight $\mu$ ($p_T\geq 27$ GeV), pass HLT_IsoMu24", ha='left', va='top', size='x-small', color='red', transform=fig.transFigure)
+txtcount = 0
+cutyloc = [0.65,0.6,0.55,0.5]
+if analysis!="LeadJetPtAnalysis":    
+    plt.text(0.2, cutyloc[txtcount], f"leadptcut: {triggerdict['leadjetpt']}"      , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    txtcount += 1
+if analysis!="SubleadJetPtAnalysis": 
+    plt.text(0.2, cutyloc[txtcount], f"subleadptcut: {triggerdict['subleadjetpt']}", ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    txtcount += 1
+if analysis!="MjjAnalysis":          
+    plt.text(0.2, cutyloc[txtcount], f"mjjcut: {triggerdict['mjj']}"               , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    txtcount += 1
+if analysis!="DetaAnalysis":         
+    plt.text(0.2, cutyloc[txtcount], f"detacut: {triggerdict['deta']}"             , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    txtcount += 1
 
 plt.text(0.85,0.84, r"$N_{off/HLT} = $"+str(len(HLTPassed_OFFJets)), ha='right', size='x-small', color='cadetblue', transform=fig.transFigure)
 plt.text(0.85,0.8, r"$N_{off} = $"+str(len(HLTCandJets)), ha='right', size='x-small', color='cadetblue', transform=fig.transFigure)
@@ -133,11 +147,11 @@ plt.text(0.85,0.8, r"$N_{off} = $"+str(len(HLTCandJets)), ha='right', size='x-sm
 plt.legend(loc=2)
 plt.grid()
 if TightCuts:
-    plt.savefig("{0}{1}_Tight.png".format(pltPath,vardict["plotname"]))
-    print("Efficiency plots made! Name: {0}{1}_TightEff.png".format(pltPath,vardict["plotname"]))
+    plt.savefig(f"{pltPath}{vardict['plotname']}_Tight.png")
+    print(f"Efficiency plots made! Name: {pltPath}{vardict['plotname']}_TightEff.png")
 else:
-    plt.savefig("{0}{1}.png".format(pltPath,vardict["plotname"]))
-    print("Efficiency plots made! Name: {0}{1}_Eff.png".format(pltPath,vardict["plotname"]))
+    plt.savefig(f"{pltPath}{vardict['plotname']}.png")
+    print(f"Efficiency plots made! Name: {pltPath}{vardict['plotname']}_Eff.png")
 
 
 ### SHAPES ###
@@ -153,15 +167,17 @@ if shapeAnalysis:
     hep.histplot(candsHist, candsBins, histtype='step', label=f"cands {analysis[:-8]}", color="tab:blue", density=False, stack=True)
     hep.histplot(passdHist, passdBins, histtype='step', label=f"passed {analysis[:-8]}", color="tab:orange", density=False, stack=True, linestyle='--')
     hep.cms.text("Preliminary")
-    hep.cms.lumitext(r"23 Single $\mu$, (13 TeV)")
+    hep.cms.lumitext(r"Summer23 (L=12.98 fb$^{-1}$)")
     plt.xlabel(vardict["xlabel"])
     plt.ylabel(r"Counts")
-    if analysis!="LeadJetPtAnalysis":    plt.text(0.2, 0.65, "leadptcut: {}".format(triggerdict["leadjetpt"])      , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
-    if analysis!="SubleadJetPtAnalysis": plt.text(0.2, 0.6 , "subleadptcut: {}".format(triggerdict["subleadjetpt"]), ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
-    if analysis!="MjjAnalysis":          plt.text(0.2, 0.55, "mjjcut: {}".format(triggerdict["mjj"])               , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
-    if analysis!="DetaAnalysis":         plt.text(0.2, 0.5 , "detacut: {}".format(triggerdict["deta"])             , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    if analysis!="LeadJetPtAnalysis":    plt.text(0.2, 0.65, f"leadptcut: {triggerdict['leadjetpt']}"      , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    if analysis!="SubleadJetPtAnalysis": plt.text(0.2, 0.6 , f"subleadptcut: {triggerdict['subleadjetpt']}", ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    if analysis!="MjjAnalysis":          plt.text(0.2, 0.55, f"mjjcut: {triggerdict['mjj']}"               , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
+    if analysis!="DetaAnalysis":         plt.text(0.2, 0.5 , f"detacut: {triggerdict['deta']}"             , ha='left', size='x-small', color='steelblue', transform=fig.transFigure)
     if analysis in ["LeadJetPtAnalysis", "SubleadJetPtAnalysis", "MjjAnalysis", "DetaAnalysis"]:
         plt.axvline(x=vardict["threshold"], color='tab:red', label="Threshold", linestyle="--")
+    plt.text(0.85,0.84, r"$N_{off/HLT} = $"+str(len(passd)), ha='right', size='x-small', color='cadetblue', transform=fig.transFigure)
+    plt.text(0.85,0.8, r"$N_{off} = $"+str(len(cands)), ha='right', size='x-small', color='cadetblue', transform=fig.transFigure)
     plt.legend()
     plt.grid()
     if TightCuts:
