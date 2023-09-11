@@ -1,5 +1,5 @@
 """
-    This program calculates and plots the efficiency for VBF trigger path.
+    This program calculates and plots the efficiency for VBF trigger path. 
     Raymond Kil, 2023
 """
 

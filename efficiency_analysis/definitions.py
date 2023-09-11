@@ -335,7 +335,6 @@ def GetVardict(HLTPassed_OFFJets, HLTCandJets, analysis, triggerdict, shouldPass
             "plotname": "deta",
             "binsize"  : 0.1,
             "HLTPassedQuantity": ak.flatten(GetMaxEta(HLTPassed_OFFJets)[-1]),
-            #"HLTCandQuantity": ak.flatten(GetMaxEta(HLTCandJets)[-1]),
             "HLTCandQuantity": ak.flatten(shouldPassHLT_detas),
             "maxbin": 6,
             "xlabel": r"Offline $\Delta\eta$",
