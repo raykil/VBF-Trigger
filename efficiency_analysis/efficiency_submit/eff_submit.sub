@@ -1,8 +1,0 @@
-executable = $(filename)
-arguments  = $(ClusterId)$(ProcId)
-output     = $(ClusterId).$(ProcId).out
-error      = $(ClusterId).$(ProcId).err
-log        = $(ClusterId).log
-+JobFlavour = "nextweek"
-
-queue filename matching files /afs/cern.ch/user/j/jkil/efficiencyanalysis/exec/efficiencyanalysis*.sh
