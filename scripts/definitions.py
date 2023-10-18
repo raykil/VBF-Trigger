@@ -371,59 +371,23 @@ def MakeGolden(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, Lumi
 @PrintCuts
 def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, analysis, triggerdict):
     print(f"Number of OFFJets before jetID cuts: {ak.sum(ak.num(OFFJets))}")
-    """
-    num = 5
-    de = (abs(OFFJets.eta) < 2.4)
-    ef1 = (triggerdict["chEmEF"] > OFFJets.chEmEF)
-    ef2 = (triggerdict["chEmEF"] > OFFJets.chEmEF)
-    ef3 = (triggerdict["neEmEF"] > OFFJets.neEmEF)
-    ef4 = (triggerdict["neHEF"] > OFFJets.neHEF)
-
-    print(f"Number of OFFJets before jetID cuts: {ak.sum(ak.num(OFFJets))}")
-
-    df1 = [[(a, b) for a, b in zip(sublist_de, sublist_ef)] for sublist_de, sublist_ef in zip(de, ef1)]
-    chEmEFCut = [[False if i[0] and not i[1] else True for i in li] for li in df1]
-    OFFJets = DoCuts([chEmEFCut, "chEmEFCut"], OFFJets=OFFJets)[0]
-    print(f"Number of OFFJets after chEmEFCut: {ak.sum(ak.num(OFFJets))}")
-    
-    df2 = [[(a, b) for a, b in zip(sublist_de, sublist_ef)] for sublist_de, sublist_ef in zip(de, ef2)]
-    chHEFCut = [[False if i[0] and not i[1] else True for i in li] for li in df2]
-    OFFJets = DoCuts([chHEFCut, "chHEFCut"], OFFJets=OFFJets)[0]
-    print(f"Number of OFFJets after chHEFCut: {ak.sum(ak.num(OFFJets))}")
-
-    df3 = [[(a, b) for a, b in zip(sublist_de, sublist_ef)] for sublist_de, sublist_ef in zip(de, ef3)]
-    neEmEFCut = [[False if i[0] and not i[1] else True for i in li] for li in df3]
-    OFFJets = DoCuts([neEmEFCut, "neEmEFCut"], OFFJets=OFFJets)[0]
-    print(f"Number of OFFJets after neEmEFCut: {ak.sum(ak.num(OFFJets))}")
-
-    df4 = [[(a, b) for a, b in zip(sublist_de, sublist_ef)] for sublist_de, sublist_ef in zip(de, ef4)]
-    neHEFCut = [[False if i[0] and not i[1] else True for i in li] for li in df4]
-    OFFJets = DoCuts([neHEFCut, "neHEFCut"], OFFJets=OFFJets)[0]
-    print(f"Number of OFFJets after neHEFCut: {ak.sum(ak.num(OFFJets))}")
-    """
-
-    print(f"Number of OFFJets before jetID cuts: {ak.sum(ak.num(OFFJets))}")
     if (analysis!="leadchEmEF") and (analysis!="subleadchEmEF"):
-        de = (abs(OFFJets.eta) < 2.4)
-        ef = (triggerdict["chEmEF"] > OFFJets.chEmEF)
+        de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["chEmEF"] > OFFJets.chEmEF)
         chEmEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
         OFFJets = DoCuts([chEmEFCut, "chEmEFCut"], OFFJets=OFFJets)[0]
 
     if (analysis!="leadchHEF") and (analysis!="subleadchHEF"):
-        de = (abs(OFFJets.eta) < 2.4)
-        ef = (triggerdict["chHEF"] < OFFJets.chHEF)
+        de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["chHEF"] < OFFJets.chHEF)
         chHEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
         OFFJets = DoCuts([chHEFCut, "chHEFCut"], OFFJets=OFFJets)[0]
 
     if (analysis!="leadneEmEF") and (analysis!="subleadneEmEF"):
-        de = (abs(OFFJets.eta) < 2.4)
-        ef = (triggerdict["neEmEF"] > OFFJets.neEmEF)
+        de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["neEmEF"] > OFFJets.neEmEF)
         neEmEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
         OFFJets = DoCuts([neEmEFCut, "neEmEFCut"], OFFJets=OFFJets)[0]
 
     if (analysis!="leadneHEF") and (analysis!="subleadneHEF"):
-        de = (abs(OFFJets.eta) < 2.4)
-        ef = (triggerdict["neHEF"] > OFFJets.neHEF)
+        de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["neHEF"] > OFFJets.neHEF)
         neHEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
         OFFJets = DoCuts([neHEFCut, "neHEFCut"], OFFJets=OFFJets)[0]
 
@@ -433,13 +397,13 @@ def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, 
     MuonCuts = (ak.any((MuonCollections.pt>=triggerdict["muonpt"]) & (MuonCollections.muRelIso<triggerdict["muRelIso"]), axis=1))
     OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([MuonCuts, "MuonCuts"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
 
-    if "IsoMu27" in HLTJets.fields:
-        IsoMu27Cut = HLTJets.IsoMu27
-        OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([IsoMu27Cut,"IsoMu27Cut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
-
-    elif "IsoMu24" in HLTJets.fields:
+    if "IsoMu24" in HLTJets.fields:
         IsoMu24Cut = HLTJets.IsoMu24
         OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([IsoMu24Cut,"IsoMu24Cut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
+
+    #elif "IsoMu27" in HLTJets.fields:
+    #    IsoMu27Cut = HLTJets.IsoMu27
+    #    OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([IsoMu27Cut,"IsoMu27Cut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
 
     if "rho" in METCollections.fields:
         METpt_nomu = np.sqrt((ak.sum(MuonCollections.px, axis=1) + METCollections.px)**2 + (ak.sum(MuonCollections.py, axis=1) + METCollections.py)**2)
@@ -619,9 +583,6 @@ def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis,
         trigpassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=OFFcombo)[5]
         if filterbits:
             fbcut = trigpassed_OFFcombo.jet1.JetPassedHLT & trigpassed_OFFcombo.jet2.JetPassedHLT
-            #print(fbcut)
-            #print(ak.count_nonzero(fbcut))
-            #print(trigpassed_OFFcombo.jet1)
             fbpassed_combo_j1, fbpassed_combo_j2 = DoCuts([fbcut, "fbcut"], OFFJets=trigpassed_OFFcombo.jet1)[0], DoCuts([fbcut, "fbcut"], OFFJets=trigpassed_OFFcombo.jet2)[0]
             passed_jjsum = fbpassed_combo_j1 + fbpassed_combo_j2
             passed_mjj   = passed_jjsum.mass
