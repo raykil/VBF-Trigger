@@ -2,7 +2,7 @@
     This program retrieves the luminosity information from NANOAOD or MINIAOD files 
     and produces the JSON file in the format compatible to brilcalc.
     More information on brilcalc here: http://opendata.cern.ch/docs/cms-guide-luminosity-calculation#install-brilcalc.
-    Raymond Kil, 2023
+    Raymond Kil, 2023 
 """
 
 import uproot
