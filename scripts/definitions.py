@@ -1,5 +1,6 @@
 """
-    This will be the combination.
+    This script contains the function definitions used in HLT VBF Trigger efficiency analysis for Run3 data.
+    Raymond Kil, 2023
 """
 import numpy as np
 import awkward as ak
@@ -202,7 +203,7 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
         }
         if tightcuts=="tight":
             if analysis!="leadpt"   : triggerdict.update({"leadjetpt": 130})
-            if analysis!="subleadpt": triggerdict.update({"subleadjetpt": 60})
+            if analysis!="subleadpt": triggerdict.update({"subleadjetpt": 60}) #60
             if analysis!="mjj"      : triggerdict.update({"mjj": 1300})
             if analysis!="deta"     : triggerdict.update({"deta": 3.7})
     
@@ -492,7 +493,7 @@ def ApplyTriggerCuts(OFFJets, HLTJets, TrigObjs, METCollections, analysis, trigg
         OFFcombo = DoCuts([mjjcut, "mjjcut"], JetCombo=OFFcombo)[-1]
 
     if analysis!="deta":
-        detas = vector.Spatial.deltaeta(OFFcombo.jet1, OFFcombo.jet2)
+        detas = abs(vector.Spatial.deltaeta(OFFcombo.jet1, OFFcombo.jet2))
         detacut = (detas >= triggerdict["deta"])
         OFFcombo = DoCuts([detacut, "detacut"], JetCombo=OFFcombo)[-1]
 
@@ -545,19 +546,20 @@ def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis,
     elif triggerpath=="pt110": HLTCut = [HLTJets.pt110][0]
 
     if "pt" in analysis or "EF" in analysis:
-        trigpassed_OFFJets = DoCuts([HLTCut, "HLTCut"], OFFJets=shouldPassHLT_Jets)[0]
+        trigpassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=OFFcombo)[5]
+
         if filterbits:
             # selecting jets that passed VBF HLT trigger
-            JetPassedHLTCut = trigpassed_OFFJets.JetPassedHLT
-            fbpassed_OFFJets = DoCuts([JetPassedHLTCut, "JetPassedHLTCut"], OFFJets=trigpassed_OFFJets)[0]
-
-            # Discard events where the number of HLT VBF passed jet is less than one
-            dijetcut = ak.where(ak.num(fbpassed_OFFJets)>=2, True, False)
-            passed_OFFJets = DoCuts([dijetcut, "dijetcut"], OFFJets=fbpassed_OFFJets)[0]
+            combofbcut = trigpassed_OFFcombo.jet1.JetPassedHLT & trigpassed_OFFcombo.jet2.JetPassedHLT
+            fbpassed_OFFcombo = DoCuts([combofbcut, "combofbcut"], JetCombo=trigpassed_OFFcombo)[5]
+            nocombocut = ak.where(ak.num(fbpassed_OFFcombo)>0, True, False)
+            passed_OFFcombo = DoCuts([nocombocut, "nocombocut"], JetCombo=fbpassed_OFFcombo)[5]
         else:
-            passed_OFFJets = trigpassed_OFFJets
-        if   analysis=="leadpt"       : return shouldPassHLT_Jets.pt[:,0], passed_OFFJets.pt[:,0]
-        elif analysis=="subleadpt"    : return shouldPassHLT_Jets.pt[:,1], passed_OFFJets.pt[:,1]
+            passed_OFFcombo = trigpassed_OFFcombo
+            passed_OFFJets = trigpassed_OFFcombo.jet1
+
+        if   analysis=="leadpt"       : return ak.flatten(OFFcombo.jet1.pt), ak.flatten(passed_OFFcombo.jet1.pt)
+        elif analysis=="subleadpt"    : return ak.flatten(OFFcombo.jet2.pt), ak.flatten(passed_OFFcombo.jet2.pt)
 
         elif analysis=="leadchEmEF"   : return shouldPassHLT_Jets.chEmEF[:,0], passed_OFFJets.chEmEF[:,0]
         elif analysis=="leadchHEF"    : return shouldPassHLT_Jets.chHEF[:,0] , passed_OFFJets.chHEF[:,0]
@@ -616,8 +618,8 @@ def GetEfficiency(binsize, maxbin, HLTPassedQuantity, HLTCandQuantity):
 
     for i, c in enumerate(bincenters):
         minlim, maxlim = round(c - binsize,5), round(c + binsize,5)
-        numerator = ak.count_nonzero(ak.where((HLTPassedQuantity>=minlim) & (HLTPassedQuantity<=maxlim), 1, 0))
-        denominator = ak.count_nonzero(ak.where((HLTCandQuantity   >=minlim) & (HLTCandQuantity   <=maxlim), 1, 0))
+        numerator = ak.count_nonzero(ak.where((HLTPassedQuantity>=minlim) & (HLTPassedQuantity<maxlim), 1, 0))
+        denominator = ak.count_nonzero(ak.where((HLTCandQuantity   >=minlim) & (HLTCandQuantity   <maxlim), 1, 0))
         errmin[i],errmax[i] = GetClopperPearsonInterval(numerator,denominator,0.05)
         if denominator!=0: effs[i] = numerator/denominator
     yerrmin, yerrmax = np.nan_to_num(errmin), np.nan_to_num(errmax)
@@ -628,10 +630,10 @@ def GetVardict(numerator, denominator, analysis, triggerdict):
     if analysis=="leadpt":
         vardict = {
             "plotname": "leadpt",
-            "binsize"  : 5, #5
+            "binsize"  : 5,
             "numerator": numerator,
             "denominator": denominator,
-            "maxbin": 300, #300
+            "maxbin": 300,
             "xlabel": r"$p_T^{leadjet}$ [GeV]",
             "threshold": triggerdict["leadjetpt"],
         }

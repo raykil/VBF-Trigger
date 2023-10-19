@@ -8,7 +8,7 @@ import glob
 parser = OptionParser(usage="%prog [options]")
 parser.add_option("--triggerpath", dest="triggerpath", default="pt105" , help="if comparing, we can leave out the triggerpath. If single plotting, you must specify the triggerpath.")
 parser.add_option("--analysis"   , dest="analysis"   , default="leadpt", help="options: LeadJetPtAnalysis, SubleadJetPtAnalysis, MjjAnalysis, DetaAnalysis")
-parser.add_option("--tightcuts"  , dest="tightcuts"  , default=""      , help="put 'tight' of 'loose'")
+parser.add_option("--tightcuts"  , dest="tightcuts"  , default=""      , help="put 'tight' of 'loose'. If compare=tt, then doesn't matter.")
 parser.add_option("--outputdir"  , dest="outputdir"  , default="./"    , help="plot output directory")
 parser.add_option("--effoutdir"  , dest="effoutdir"  , default=""      , help="efficiency plot values output directory. If not wanted, leave void.")
 parser.add_option("--shape"      , dest="shape"      , default=False   , help="produce histograms of property distribution")
@@ -38,7 +38,13 @@ elif compare=="cd":
 else:
     tight = glob.glob(f"{jsonpath}*fb*/*{analysis}*{triggerpath}*tight*.json") # outputs strings
     loose = glob.glob(f"{jsonpath}*fb*/*{analysis}*{triggerpath}*loose*.json")
+    #tight = glob.glob(f"{jsonpath}*C0v3fb*/*{analysis}*{triggerpath}*tight*.json") # subset, fixed
+    #loose = glob.glob(f"{jsonpath}*C0v3fb*/*{analysis}*{triggerpath}*loose*.json")
+    # later do this too and compare
+    #tight = glob.glob(f"{jsonpath}*C0v3fb*/*{analysis}*{triggerpath}*tight.json") # subset but original
+    #loose = glob.glob(f"{jsonpath}*C0v3fb*/*{analysis}*{triggerpath}*loose.json")
     tight_numerators, tight_denominators, loose_numerators, loose_denominators = [],[],[],[]
+
     for t, l in zip(tight, loose):
         tights, looses = json.load(open(t,'r')), json.load(open(l,'r'))
         tight_numerators.extend(tights["numerator"])
@@ -87,4 +93,4 @@ plt.legend(loc=2)
 plt.grid()
 
 plt.savefig(f"{outputdir}{analysis}_{triggerpath}{'_'+compare}{tightcuts}.png")
-print(f"{outputdir}{analysis}_{triggerpath}{'_'+compare}{tightcuts}.png made!")
+print(      f"{outputdir}{analysis}_{triggerpath}{'_'+compare}{tightcuts}.png made!")

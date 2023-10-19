@@ -25,7 +25,7 @@ outputdir   = options.outputdir
 subset      = options.subset
 
 datapath    = f"/eos/user/j/jkil/SUEP/vbftrigger/datasets/parq/{dataset}_parq/"
-outputjson  = f"{outputdir}{dataset}_{analysis}_{triggerpath}_{tightcuts}.json"
+outputjson  = f"{outputdir}{dataset}_{analysis}_{triggerpath}_{tightcuts}.json" 
 triggerdict = vbf.GetTriggerDict(triggerpath, analysis, tightcuts)
 
 ### PROCESSING ###
