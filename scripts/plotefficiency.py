@@ -4,6 +4,7 @@ from optparse import OptionParser
 import definitions as vbf
 import json
 import glob
+import os
 
 parser = OptionParser(usage="%prog [options]")
 parser.add_option("--triggerpath", dest="triggerpath", default="pt105" , help="if comparing, we can leave out the triggerpath. If single plotting, you must specify the triggerpath.")
@@ -36,8 +37,10 @@ elif compare=="cd":
     #d = 
     pass
 else:
-    tight = glob.glob(f"{jsonpath}*fb*/*{analysis}*{triggerpath}*tight*.json") # outputs strings
-    loose = glob.glob(f"{jsonpath}*fb*/*{analysis}*{triggerpath}*loose*.json")
+    #tight = glob.glob(f"{jsonpath}*fb*/*{analysis}*{triggerpath}*tight*.json") # outputs strings
+    tight = sum([glob.glob(f"{jsonpath}{t}/*{analysis}*{triggerpath}*tight*") for t in os.listdir(jsonpath) if "prom" in t and "fb" not in t], [])
+    #loose = glob.glob(f"{jsonpath}*fb*/*{analysis}*{triggerpath}*loose*.json")
+    loose = sum([glob.glob(f"{jsonpath}{l}/*{analysis}*{triggerpath}*loose*") for l in os.listdir(jsonpath) if "prom" in l and "fb" not in l], [])
     #tight = glob.glob(f"{jsonpath}*C0v3fb*/*{analysis}*{triggerpath}*tight*.json") # subset, fixed
     #loose = glob.glob(f"{jsonpath}*C0v3fb*/*{analysis}*{triggerpath}*loose*.json")
     # later do this too and compare
@@ -53,9 +56,9 @@ else:
         loose_denominators.extend(looses["denominator"])
     tight_vardict = vbf.GetVardict(tight_numerators, tight_denominators, analysis, trigdict)
     loose_vardict = vbf.GetVardict(loose_numerators, loose_denominators, analysis, trigdict)
-    tight_vardict.update({"label": "tight", "color": 'tab:blue'})
-    loose_vardict.update({"label": "loose", "color": 'tab:green'})
-    if compare=="tt": vardicts = [tight_vardict, loose_vardict]
+    tight_vardict.update({"label": "tight", "color": 'b'})
+    loose_vardict.update({"label": "loose", "color": 'r'})
+    if   compare=="tt"     : vardicts = [tight_vardict, loose_vardict]
     elif tightcuts=="tight": vardicts = [tight_vardict]
     elif tightcuts=="loose": vardicts = [loose_vardict]
 
@@ -69,8 +72,8 @@ for vardict in vardicts:
         effdict = vbf.GetEffDict(vardict, trigdict, effs, yerrmin, yerrmax, bincenters)
         with open(f"{effoutdir}{analysis}_{triggerpath}_{compare}_{vardict['label']}_effvals.json", 'w') as j: json.dump(effdict, j, cls=vbf.NpEncoder, indent=4)
 
-plt.text(0.6,0.84, r" $N_{off/HLT} = $"+str(len(vardict["numerator"]))  , ha='left', size='x-small', color='cadetblue', transform=fig.transFigure)
-plt.text(0.6,0.8,  r" $N_{off} = $"    +str(len(vardict["denominator"])), ha='left', size='x-small', color='cadetblue', transform=fig.transFigure)
+#plt.text(0.6,0.84, r" $N_{off/HLT} = $"+str(len(vardict["numerator"]))  , ha='left', size='x-small', color='cadetblue', transform=fig.transFigure)
+#plt.text(0.6,0.8,  r" $N_{off} = $"    +str(len(vardict["denominator"])), ha='left', size='x-small', color='cadetblue', transform=fig.transFigure)
 plt.xlabel(vardict["xlabel"])
 plt.ylabel("Trigger Efficiency")
 plt.ylim(-0.06,1.2)

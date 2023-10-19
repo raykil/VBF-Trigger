@@ -145,6 +145,7 @@ def MakeVector(OFFJets, MuonCollections, METCollections=""):
         "neEmEF": OFFJets.neEmEF,
         "neHEF": OFFJets.neHEF,
         "muEF": OFFJets.muEF,
+        "jetid": OFFJets.jetid
     })
 
     if len(METCollections):
@@ -372,6 +373,10 @@ def MakeGolden(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, Lumi
 @PrintCuts
 def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, analysis, triggerdict):
     print(f"Number of OFFJets before jetID cuts: {ak.sum(ak.num(OFFJets))}")
+
+    jetidCut = ak.where(OFFJets.jetid>=2, True, False)
+    OFFJets = DoCuts([jetidCut,"jetidCut"], OFFJets=OFFJets)[0]
+
     if (analysis!="leadchEmEF") and (analysis!="subleadchEmEF"):
         de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["chEmEF"] > OFFJets.chEmEF)
         chEmEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
@@ -539,6 +544,28 @@ def SelectHLTJetsCand(OFFJets, OFFcombo):
 
 @PrintCuts
 def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis, triggerpath, filterbits):
+    jjsum = OFFcombo.jet1 + OFFcombo.jet2
+    maxmjjidx = ak.Array(list(ak.unflatten(ak.argmax(jjsum.mass,axis=1),1)))
+    shouldPass_OFFcombo = OFFcombo[maxmjjidx] # denominator
+
+    HLTCut = [HLTJets.pt105|HLTJets.pt105triple][0]
+    trigPassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=shouldPass_OFFcombo)[5] # numerator
+
+    if analysis=="leadpt": 
+        return ak.flatten(shouldPass_OFFcombo.jet1.pt), ak.flatten(trigPassed_OFFcombo.jet1.pt)
+    elif analysis=="mjj":
+        shouldPass_jjsum = shouldPass_OFFcombo.jet1 + shouldPass_OFFcombo.jet2
+        trigPassed_jjsum = trigPassed_OFFcombo.jet1 + trigPassed_OFFcombo.jet2
+        return ak.flatten(shouldPass_jjsum.mass), ak.flatten(trigPassed_jjsum.mass)
+    elif analysis=="deta":
+        shouldPass_deta = vector.Spatial.deltaeta(shouldPass_OFFcombo.jet1, shouldPass_OFFcombo.jet2)
+        trigPassed_deta = vector.Spatial.deltaeta(trigPassed_OFFcombo.jet1, trigPassed_OFFcombo.jet2)
+        return ak.flatten(shouldPass_deta), ak.flatten(trigPassed_deta)
+
+
+"""
+@PrintCuts
+def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis, triggerpath, filterbits):
     if   triggerpath=="pt105": HLTCut = [HLTJets.pt105|HLTJets.pt105triple][0]
     elif triggerpath=="pt125": HLTCut = [HLTJets.pt125|HLTJets.pt125triple][0]
     elif triggerpath=="pt75" : HLTCut = [HLTJets.pt75|HLTJets.pt75triple][0]
@@ -595,7 +622,7 @@ def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis,
             passed_deta  = vector.Spatial.deltaeta(trigpassed_OFFcombo.jet1, trigpassed_OFFcombo.jet2)
         if   analysis=="mjj" : return ak.flatten(shouldPass_mjj) , ak.flatten(passed_mjj)
         elif analysis=="deta": return abs(ak.flatten(shouldPass_deta)), abs(ak.flatten(passed_deta))
-
+"""
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer) : return int(obj)
@@ -655,7 +682,7 @@ def GetVardict(numerator, denominator, analysis, triggerdict):
             "binsize"  : 50,
             "numerator": numerator,
             "denominator": denominator,
-            "maxbin": 2800,
+            "maxbin": 4000,
             "xlabel": r"$M_{jj}$ [GeV]",
             "threshold": triggerdict["mjj"],
         }
@@ -666,7 +693,7 @@ def GetVardict(numerator, denominator, analysis, triggerdict):
             "binsize"  : 0.1,
             "numerator": numerator,
             "denominator": denominator,
-            "maxbin": 10,
+            "maxbin": 7,
             "xlabel": r"$\Delta\eta (j_1,j_2)$",
             "threshold": triggerdict["deta"],
         }

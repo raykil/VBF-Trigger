@@ -48,5 +48,5 @@ else:
         "numerator"  : list(passedQuantity),
         "denominator": list(shouldPassQuantity)
     }
-    with open(outputjson, 'w') as f: json.dump(quantity_dict, f, cls=vbf.NpEncoder, indent=4)
+    #with open(outputjson, 'w') as f: json.dump(quantity_dict, f, cls=vbf.NpEncoder, indent=4)
     print(f"{outputdir}{dataset}_{analysis}_{triggerpath}_{tightcuts}.json created!")
