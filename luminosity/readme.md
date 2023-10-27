@@ -1,6 +1,6 @@
  
-# Notes on .txt files in luminosity directory (231023)
-
+# Notes on .txt files in luminosity directory
+## Raymond Kil, 231023
 - ```2023all_lumiJson.txt``` contains the luminosity blocks for the following eight datasets:
     - ```/Muon[0-1]/Run2023C-PromptReco-v[3-4]/MINIAOD```, and
     - ```/Muon[0-1]/Run2023D-PromptReco-v[1-2]/MINIAOD```.
