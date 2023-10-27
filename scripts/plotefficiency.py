@@ -19,10 +19,10 @@ parser.add_option("--compare"    , dest="compare"    , default=""      , help="I
 triggerpath = options.triggerpath
 analysis    = options.analysis
 tightcuts   = options.tightcuts
-outputdir   = options.outputdir # /eos/user/j/jkil/www/VBFSUEP/efficiency/FinalPlots/an/
+outputdir   = options.outputdir
 effoutdir   = options.effoutdir
 shape       = options.shape
-jsonpath    = options.jsonpath # "/eos/user/j/jkil/SUEP/vbftrigger/datasets/json/"
+jsonpath    = options.jsonpath
 compare     = options.compare
 
 # sorting out datasets

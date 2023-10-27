@@ -45,9 +45,9 @@ This script takes in the JSON files that contains the numerators and denominator
 |```triggerpath```|Equivalent to above.|
 |```analysis```|Equivalent to above.|
 |```tightcuts```|Equivalent to above.|
-|```outputdir```||
-|```effoutdir```||
-|```shape```||
+|```outputdir```|Output directory for the efficiency and shape plots.|
+|```effoutdir```|Output directory of the efficiency values used for plotting.|
+|```shape```|If enabled, it produces the distribution plots of the numerator and the denominator.|
 |```jsonpath```|Path to where the numerator/denominator JSON files are located. ***Note that this is a path to where the JSON "directories" are located, not a specific directory that contains the JSON files. |
 |```compare```|Enabling this option draws multiple plots on single canvas, according to the comparing criteria. The options are ```pp``` (prompt vs. parking), ```cd``` (dataset C vs. dataset D), and ```tl```(tightcuts vs. loosecuts). |
 
@@ -86,34 +86,4 @@ vbftrigger/
 ├─ scripts/
 ``` 
 
-
-
-
-230918
-
-Here is an expanded note about SelectHLTJetsCand function.
-
-# Reshaping Jets 
-  # Originally, Jets for each event is single array of jets like: [[201, 69, 60.9],...]
-  # exp_OFFJets_pt returns duplicates of the set of jets to match OFFcombo.
-  # If OFFcombo.jet1[num], OFFcombo.jet1[num] = [201, 201], [69, 60.9], then exp_OFFJets_pt is [[201, 69, 60.9], [201, 69, 60.9]].
-  # exp_OFFcombo_jet1 == OFFcombo.jet1. This does not change.
-
-# Masking OFFcombo jets in Jets
-  # jet1mask masks the leadjets in the broadcasted exp_OFFJets_pt format. Ex) [[201, 69, 60.9], [201, 69, 60.9]] -> [[True, False, False], [True, False, False]]
-  # Similar with jet2mask, selects the subleadjet.                        Ex) [[201, 69, 60.9], [201, 69, 60.9]] -> [[False, True, False], [False, False, True]]
-
-230925
-The vbftrigger directory is now organized in the following way:
-```
-vbftrigger/
-├─ vbftrigger/
-│  ├─ scripts/
-│  │ ├─ __init__.py
-│  │ ├─ definitions.py
-│  ├─ efficiency_analysis/
-│  │ ├─ efficiencyanalysis.py
-└──── validation/
-```
-Now when I execute a script that is NOT in scripts directory (say, in efficiency_analysis) that imports scripts from scripts, the commandline looks like: python -m vbftrigger.efficiency_analysis.efficiencyanalysis from the directory /eos/user/j/jkil/SUEP/vbftrigger
 

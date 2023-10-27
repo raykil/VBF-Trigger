@@ -32,9 +32,9 @@ with open(filenames,'r') as f:
 begs = np.arange(0, len(rootfiles)//nparq*nparq+1, nparq, dtype=int)
 fins = np.append(np.arange(nparq, len(rootfiles)+1, nparq, dtype=int),len(rootfiles))
 
-if "store" in rootfiles[0]: # nanoaod files in DAS
+if "store" in rootfiles[0]: # DAS
     prefix = "root://cms-xrd-global.cern.ch//"
-elif "eos" in rootfiles[0]: # nanoaod files in local directory
+elif "eos" in rootfiles[0]: # local directory
     prefix = ""
 
 for beg, fin in zip(begs, fins):

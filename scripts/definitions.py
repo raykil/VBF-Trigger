@@ -434,7 +434,7 @@ def AssignFilterBitsToOFFJets(OFFJets, HLTJets, TrigObjs, METCollections, filter
         PickJetsCut = ak.where(TrigObjs.id==1, True, False)
         TrigObjs = DoCuts([PickJetsCut, "PickJetsCut"], TrigObjs=TrigObjs)[3] # jetwise cut
 
-        # selecting TrigObjs jets that pass HLT VBF filterBits.
+        # selecting TrigObjs jets that pass HLT VBF filterBits
         rightmostbit = (TrigObjs.filterBits) & (-1*TrigObjs.filterBits)
         PassHLTVBFfBCut = (rightmostbit==1)|(rightmostbit==2)
         TrigObjs = DoCuts([PassHLTVBFfBCut, "PassHLTVBFfBCut"], TrigObjs=TrigObjs)[3]
