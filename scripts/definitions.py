@@ -47,12 +47,12 @@ def MakeHLT(filenames, path):
         except (OSError, uproot.exceptions.KeyInFileError) as e: print(f"{path+filename} failed because of {e}. Skipping for now...")
     return HLTJets
 
-def MakeObjects(filenames,path):
+def MakeObjects(rootfiles):
     OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, Luminosities = [],ak.Array([]), [], [], [], []
-    for filename in filenames:
-        print("Processing file {0}".format(filename))
+    for filename in rootfiles:
+        print(f"Processing file {filename}...")
         try:
-            with uproot.open(path + filename) as f:
+            with uproot.open(filename) as f:
                 events = f["Events"]
 
                 HLTJet = ak.zip({
@@ -90,6 +90,7 @@ def MakeObjects(filenames,path):
                     "neEmEF": events["Jet_neEmEF"].array(),
                     "neHEF" : events["Jet_neHEF"].array(),
                     "muEF"  : events["Jet_muEF"].array(),
+                    "jetid" : events["Jet_jetId"].array()
                 })
 
                 MuonCollection = ak.zip({
@@ -126,7 +127,7 @@ def MakeObjects(filenames,path):
             TrigObjs        = ak.concatenate((TrigObjs, TrigObj))
             METCollections  = ak.concatenate((METCollections, METCollection))
             Luminosities    = ak.concatenate((Luminosities, Luminosity))
-        except (OSError, uproot.exceptions.KeyInFileError) as e: print(f"{path+filename} failed because of {e}. Skipping for now...")
+        except (OSError, uproot.exceptions.KeyInFileError) as e: print(f"{filename} failed because of {e}. Skipping for now...")
     return OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, Luminosities
 
 def MakeVector(OFFJets, MuonCollections, METCollections=""):
@@ -201,13 +202,16 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
             "neHEF": 0.9,
             "muonpt": 27,
             "muRelIso": 0.2
+            # LLR CUTS:
+            # "chHEF": 0.0, 0.3
+            # "muonpt": 30,
         }
         if tightcuts=="tight":
-            if analysis!="leadpt"   : triggerdict.update({"leadjetpt": 130})
-            if analysis!="subleadpt": triggerdict.update({"subleadjetpt": 60}) #60
-            if analysis!="mjj"      : triggerdict.update({"mjj": 1300})
-            if analysis!="deta"     : triggerdict.update({"deta": 3.7})
-    
+            if analysis!="leadpt"   : triggerdict.update({"leadjetpt": 130}) # LLR: 125
+            if analysis!="subleadpt": triggerdict.update({"subleadjetpt": 60}) # LLR: 50
+            if analysis!="mjj"      : triggerdict.update({"mjj": 1300}) # LLR: 1300
+            if analysis!="deta"     : triggerdict.update({"deta": 3.7}) # LLR: 4.0
+
     elif triggerpath=="pt125": # HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0(_TriplePFJet)
         triggerdict = {
             "leadjetpt": 125,
@@ -215,7 +219,7 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
             "mjj": 720,
             "deta": 3.0,
             "chEmEF": 0.99,
-            "chHEF": 0.2,
+            "chHEF": 0.3,
             "neEmEF": 0.99,
             "neHEF": 0.9,
             "muonpt": 27,
@@ -236,7 +240,7 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
             "deta": 2.5,
             "MET": 85,
             "chEmEF": 0.99,
-            "chHEF": 0.2,
+            "chHEF": 0.3,
             "neEmEF": 0.99,
             "neHEF": 0.9,
             "muonpt": 30,
@@ -257,7 +261,7 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
             "deta": 2.5,
             "MET": 85,
             "chEmEF": 0.99,
-            "chHEF": 0.2,
+            "chHEF": 0.3,
             "neEmEF": 0.99,
             "neHEF": 0.9,
             "muonpt": 30,
@@ -278,7 +282,7 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
             "deta": 0,
             "MET": 110,
             "chEmEF": 0.99,
-            "chHEF": 0.2,
+            "chHEF": 0.3,
             "neEmEF": 0.99,
             "neHEF": 0.9,
             "muonpt": 30,
@@ -290,7 +294,6 @@ def GetTriggerDict(triggerpath, analysis, tightcuts):
             if analysis!="mjj"      : triggerdict.update({"mjj": 550})
             if analysis!="deta"     : triggerdict.update({"deta": 3.5})
             if analysis!="met"      : triggerdict.update({"MET": 200})
-
     return triggerdict
 
 def PrintCuts(cutfunc):
@@ -548,7 +551,12 @@ def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis,
     maxmjjidx = ak.Array(list(ak.unflatten(ak.argmax(jjsum.mass,axis=1),1)))
     shouldPass_OFFcombo = OFFcombo[maxmjjidx] # denominator
 
-    HLTCut = [HLTJets.pt105|HLTJets.pt105triple][0]
+    if   triggerpath=="pt105": HLTCut = [HLTJets.pt105|HLTJets.pt105triple][0]
+    elif triggerpath=="pt125": HLTCut = [HLTJets.pt125|HLTJets.pt125triple][0]
+    elif triggerpath=="pt75" : HLTCut = [HLTJets.pt75|HLTJets.pt75triple][0]
+    elif triggerpath=="pt80" : HLTCut = [HLTJets.pt80|HLTJets.pt80triple][0]
+    elif triggerpath=="pt110": HLTCut = [HLTJets.pt110][0]
+
     trigPassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=shouldPass_OFFcombo)[5] # numerator
 
     if analysis=="leadpt": 
@@ -682,7 +690,7 @@ def GetVardict(numerator, denominator, analysis, triggerdict):
             "binsize"  : 50,
             "numerator": numerator,
             "denominator": denominator,
-            "maxbin": 4000,
+            "maxbin": 2500,
             "xlabel": r"$M_{jj}$ [GeV]",
             "threshold": triggerdict["mjj"],
         }
