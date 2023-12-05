@@ -1,15 +1,5 @@
-#/.DS_Store
-#/Archive
-#/Certificates
-#/Notes on Terminal & GitHub.txt
-#/NotesOnCoding.txt
-#/Presentations
-#/Readings
-#/VBF Doodles.nb
-#/__pycache__
-#/bg Feynman Diagrams
-#/rootfiles
-#/shaperootfiles
-#/vscode install logs
-#/efficiency/2023CD_parquets
 /datasets
+/suep
+/archive
+/efficiency_analysis
+/scripts/__pycache__

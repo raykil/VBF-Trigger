@@ -37,7 +37,7 @@ if not os.path.exists(shfilesDir) : os.system("mkdir {}".format(shfilesDir))
 if not os.path.exists(proxyDir)   : os.system("mkdir {}".format(proxyDir))
 
 ###### Making job.sh Files ######
-os.system("voms-proxy-init -voms cms --rfc -valid 192:00 --out {}x509up_u146772".format(proxyDir))
+os.system(f"voms-proxy-init -voms cms --rfc -valid 192:00 --out {proxyDir}x509up_u146772")
 for i, s in enumerate(slicing):
     batch = rootfilenames[s:s+nCom]
     with open("{}job_{}-{}.sh".format(shfilesDir, s, str(s+nCom-1)), 'w') as shf:
@@ -68,7 +68,7 @@ with open("submit.sub", 'w') as sub:
 print("submit.sub file created!")
 
 ###### Submitting Jobs ######
-os.system("condor_submit submit.sub") # note that submit_jobs should be done in afs, unless it has -spool argument
+os.system("condor_submit submit.sub")
 print("Congratulations! Jobs are submitted.")
 print("To check the status of the jobs, run the command condor_q.")
 os.system("condor_q")
