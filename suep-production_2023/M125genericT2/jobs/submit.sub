@@ -1,0 +1,8 @@
+executable = $(filename)
+arguments  = $(ClusterId)$(ProcId)
+output     = $(ClusterId).$(ProcId).out
+error      = $(ClusterId).$(ProcId).err
+log        = $(ClusterId).log
++JobFlavour = "tomorrow" 
+
+queue filename matching files /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/jobs/exec/job*.sh
