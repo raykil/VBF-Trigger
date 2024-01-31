@@ -11,11 +11,11 @@ import definitions as vbf
 from optparse import OptionParser
 
 parser = OptionParser(usage="%prog [options]")
-parser.add_option('--filenames', dest='filenames', default='', help='path to the .txt file that contains the list of nanoaod file names.')
-parser.add_option('--parqpath', dest='parqpath', default="./"  , help='directory where the created parquet files will be stored.')
-parser.add_option('--dataset', dest='dataset', default='', help="path to the directory where the produced parquet files will be placed")
-parser.add_option('--nparq', dest='nparq', default=200, type=int, help='Maximum number of nanoaod files to be included in one parquet file')
-parser.add_option('--onlymake', dest='onlymake', default='')
+parser.add_option('--filenames', dest='filenames', default=''  , type=str, help='path to the .txt file that contains the list of nanoaod file names')
+parser.add_option('--parqpath' , dest='parqpath' , default="./", type=str, help='directory where the created parquet files will be stored')
+parser.add_option('--dataset'  , dest='dataset'  , default=''  , type=str, help='path to the directory where the produced parquet files will be placed')
+parser.add_option('--nparq'    , dest='nparq'    , default=200 , type=int, help='Maximum number of nanoaod files to be included in one parquet file')
+parser.add_option('--onlymake' , dest='onlymake' , default=''  , type=str, help='specify the parquet file that you want to create')
 (options, args) = parser.parse_args()
 
 filenames = options.filenames
