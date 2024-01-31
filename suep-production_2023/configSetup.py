@@ -192,7 +192,7 @@ else:
 os.system(f"mv {datatier}.py config_final")
 print(f"{datatier}.py succefssfully made: ./config_final/{datatier}.py\n")
 
-# move config_template, config_final, and jobs into tag
+# organize folders
 tag = f"M{mass}{decay}T{temperature}"
 if not os.path.exists(tag): os.mkdir(tag)
 tem_cond = len([f for f in [t+'_template.py' for t in config_args.keys()] if f in os.listdir('config_template')])==5

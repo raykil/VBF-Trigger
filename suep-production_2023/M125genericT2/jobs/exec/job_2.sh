@@ -7,12 +7,12 @@ source /cvmfs/cms.cern.ch/cmsset_default.sh
 export X509_USER_PROXY=/eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/jobs/proxy/x509up_u146772
 export HOME=/afs/cern.ch/user/j/jkil
 
-cd /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/CMSSW_13_0_14/src/
+cd /eos/user/j/jkil/vbftrigger/suep-production_2023/CMSSW_13_0_14/src/
 cmsenv
 cd -
 echo 'CMSSW_13_0_14 activated.'
 
-cmsRun /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/config_final/gensim.py outputFile=file:gensim_2.root maxEvents=500 firstRun=2 seed=530269 &> /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/jobs/batchlogs/gensim_2.log
+cmsRun /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/config_final/gensim.py outputFile=file:gensim_2.root maxEvents=500 firstRun=2 seed=353254 &> /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/jobs/batchlogs/gensim_2.log
 echo 'GENSIM created.'
 
 cmsRun /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/config_final/digihlt.py inputFiles=file:gensim_2_numEvent500.root outputFile=file:digihlt_2.root &> /eos/user/j/jkil/vbftrigger/suep-production_2023/M125genericT2/jobs/batchlogs/digihlt_2.log

@@ -1,6 +1,6 @@
 """
     This program creates and submits jobs for 2023 VBF MC generation.
-    Command looks like: python3 submitJobs.py --nJobs=5 --nEvents=50 --toSave=['digihlt','miniaod','nanoaod'] --doSubmit
+    Command looks like: python3 submitJobs.py --nJobs=200 --nEvents=500 --toSave=['nanoaod'] --doSubmit --jobFlavour='tomorrow'
     Raymond Kil, 2024
 """
 
@@ -52,7 +52,7 @@ for j in range(nJobs):
         job.write(f"export X509_USER_PROXY={WORKDIR}jobs/proxy/x509up_u146772\n")
         username = os.getlogin()
         job.write(f"export HOME=/afs/cern.ch/user/{username[0]}/{username}\n\n")
-        job.write(f"cd {WORKDIR}CMSSW_13_0_14/src/\n")
+        job.write(f"cd /eos/user/j/jkil/vbftrigger/suep-production_2023/CMSSW_13_0_14/src/\n")
         job.write("cmsenv\n")
         job.write("cd -\n")
         job.write("echo 'CMSSW_13_0_14 activated.'\n")
