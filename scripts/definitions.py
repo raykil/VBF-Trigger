@@ -376,10 +376,10 @@ def MakeGolden(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, Lumi
 @PrintCuts
 def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, analysis, triggerdict):
     print(f"Number of OFFJets before jetID cuts: {ak.sum(ak.num(OFFJets))}")
-
+    
     jetidCut = ak.where(OFFJets.jetid>=2, True, False)
     OFFJets = DoCuts([jetidCut,"jetidCut"], OFFJets=OFFJets)[0]
-
+    
     if (analysis!="leadchEmEF") and (analysis!="subleadchEmEF"):
         de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["chEmEF"] > OFFJets.chEmEF)
         chEmEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
@@ -399,22 +399,21 @@ def ApplyBasicCuts(OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections, 
         de, ef = (abs(OFFJets.eta) < 2.4), (triggerdict["neHEF"] > OFFJets.neHEF)
         neHEFCut = (de & ef) | (~de & ef) | (~de & ~ef)
         OFFJets = DoCuts([neHEFCut, "neHEFCut"], OFFJets=OFFJets)[0]
-
+    
     nJetCut = (ak.num(OFFJets)>=2)
     OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([nJetCut, "nJetCut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
-
+    
     MuonCuts = (ak.any((MuonCollections.pt>=triggerdict["muonpt"]) & (MuonCollections.muRelIso<triggerdict["muRelIso"]), axis=1))
     OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([MuonCuts, "MuonCuts"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
-
     if "IsoMu24" in HLTJets.fields:
         IsoMu24Cut = HLTJets.IsoMu24
         OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([IsoMu24Cut,"IsoMu24Cut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
 
-    #elif "IsoMu27" in HLTJets.fields:
-    #    IsoMu27Cut = HLTJets.IsoMu27
-    #    OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([IsoMu27Cut,"IsoMu27Cut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
+    elif "IsoMu27" in HLTJets.fields:
+        IsoMu27Cut = HLTJets.IsoMu27
+        OFFJets, HLTJets, MuonCollections, TrigObjs, METCollections = DoCuts([IsoMu27Cut,"IsoMu27Cut"], OFFJets=OFFJets, HLTJets=HLTJets, MuonCollections=MuonCollections, TrigObjs=TrigObjs, METCollections=METCollections)[:5]
 
-    if "rho" in METCollections.fields:
+    if "rho" in METCollections.fields: # this passes even though "rho" is NOT in METCollections... Need to fix this.
         METpt_nomu = np.sqrt((ak.sum(MuonCollections.px, axis=1) + METCollections.px)**2 + (ak.sum(MuonCollections.py, axis=1) + METCollections.py)**2)
         METCollections = ak.with_field(METCollections, METpt_nomu, "METpt_nomu")
         if analysis !="METAnalysis":
@@ -486,25 +485,20 @@ def AssignFilterBitsToOFFJets(OFFJets, HLTJets, TrigObjs, METCollections, filter
 def ApplyTriggerCuts(OFFJets, HLTJets, TrigObjs, METCollections, analysis, triggerdict):
     OFFcombo = ak.combinations(OFFJets,2, fields=["jet1","jet2"])
     print("number of JetCombo before cuts: ", ak.count_nonzero(OFFcombo.jet1.pt))
-
     if analysis!="leadpt":
         leadjetptcut = (OFFcombo.jet1.pt>=triggerdict["leadjetpt"])
         OFFcombo = DoCuts([leadjetptcut, "leadjetptcut"], JetCombo=OFFcombo)[-1]
-
     if analysis!="subleadpt":
         subleadjetptcut = (OFFcombo.jet2.pt>=triggerdict["subleadjetpt"])
         OFFcombo = DoCuts([subleadjetptcut,"subleadjetptcut"], JetCombo=OFFcombo)[-1]
-
     if analysis!="mjj":
         jjsum  = OFFcombo.jet1 + OFFcombo.jet2
         mjjcut = (jjsum.mass>=triggerdict["mjj"])
         OFFcombo = DoCuts([mjjcut, "mjjcut"], JetCombo=OFFcombo)[-1]
-
     if analysis!="deta":
         detas = abs(vector.Spatial.deltaeta(OFFcombo.jet1, OFFcombo.jet2))
         detacut = (detas >= triggerdict["deta"])
         OFFcombo = DoCuts([detacut, "detacut"], JetCombo=OFFcombo)[-1]
-
     eventcut = ak.where(ak.num(OFFcombo)>0,True, False)
     OFFJets, HLTJets, mu_placeholder, TrigObjs, METCollections, OFFcombo = DoCuts([eventcut, "eventcut"], OFFJets=OFFJets, HLTJets=HLTJets, TrigObjs=TrigObjs, METCollections=METCollections, JetCombo=OFFcombo)
     return OFFJets, HLTJets, TrigObjs, METCollections, OFFcombo
@@ -545,7 +539,7 @@ def SelectHLTJetsCand(OFFJets, OFFcombo):
     print("Successfully selected the HLT VBF candidate jets!\n")
     return shouldPassHLT_Jets, shouldPassHLT_combo
 
-@PrintCuts
+#@PrintCuts
 def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis, triggerpath, filterbits):
     jjsum = OFFcombo.jet1 + OFFcombo.jet2
     maxmjjidx = ak.Array(list(ak.unflatten(ak.argmax(jjsum.mass,axis=1),1)))
@@ -557,7 +551,8 @@ def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis,
     elif triggerpath=="pt80" : HLTCut = [HLTJets.pt80|HLTJets.pt80triple][0]
     elif triggerpath=="pt110": HLTCut = [HLTJets.pt110][0]
 
-    trigPassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=shouldPass_OFFcombo)[5] # numerator
+    #trigPassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=shouldPass_OFFcombo)[5] # numerator
+    trigPassed_OFFcombo = shouldPass_OFFcombo[HLTCut]
 
     if analysis=="leadpt": 
         return ak.flatten(shouldPass_OFFcombo.jet1.pt), ak.flatten(trigPassed_OFFcombo.jet1.pt)
@@ -570,67 +565,6 @@ def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis,
         trigPassed_deta = vector.Spatial.deltaeta(trigPassed_OFFcombo.jet1, trigPassed_OFFcombo.jet2)
         return ak.flatten(shouldPass_deta), ak.flatten(trigPassed_deta)
 
-
-"""
-@PrintCuts
-def GetNumDenom(shouldPassHLT_Jets, HLTJets, METCollections, OFFcombo, analysis, triggerpath, filterbits):
-    if   triggerpath=="pt105": HLTCut = [HLTJets.pt105|HLTJets.pt105triple][0]
-    elif triggerpath=="pt125": HLTCut = [HLTJets.pt125|HLTJets.pt125triple][0]
-    elif triggerpath=="pt75" : HLTCut = [HLTJets.pt75|HLTJets.pt75triple][0]
-    elif triggerpath=="pt80" : HLTCut = [HLTJets.pt80|HLTJets.pt80triple][0]
-    elif triggerpath=="pt110": HLTCut = [HLTJets.pt110][0]
-
-    if "pt" in analysis or "EF" in analysis:
-        trigpassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=OFFcombo)[5]
-
-        if filterbits:
-            # selecting jets that passed VBF HLT trigger
-            combofbcut = trigpassed_OFFcombo.jet1.JetPassedHLT & trigpassed_OFFcombo.jet2.JetPassedHLT
-            fbpassed_OFFcombo = DoCuts([combofbcut, "combofbcut"], JetCombo=trigpassed_OFFcombo)[5]
-            nocombocut = ak.where(ak.num(fbpassed_OFFcombo)>0, True, False)
-            passed_OFFcombo = DoCuts([nocombocut, "nocombocut"], JetCombo=fbpassed_OFFcombo)[5]
-        else:
-            passed_OFFcombo = trigpassed_OFFcombo
-            passed_OFFJets = trigpassed_OFFcombo.jet1
-
-        if   analysis=="leadpt"       : return ak.flatten(OFFcombo.jet1.pt), ak.flatten(passed_OFFcombo.jet1.pt)
-        elif analysis=="subleadpt"    : return ak.flatten(OFFcombo.jet2.pt), ak.flatten(passed_OFFcombo.jet2.pt)
-
-        elif analysis=="leadchEmEF"   : return shouldPassHLT_Jets.chEmEF[:,0], passed_OFFJets.chEmEF[:,0]
-        elif analysis=="leadchHEF"    : return shouldPassHLT_Jets.chHEF[:,0] , passed_OFFJets.chHEF[:,0]
-        elif analysis=="leadneEmEF"   : return shouldPassHLT_Jets.neEmEF[:,0], passed_OFFJets.neEmEF[:,0]
-        elif analysis=="leadneHEF"    : return shouldPassHLT_Jets.neHEF[:,0] , passed_OFFJets.neHEF[:,0]
-        elif analysis=="leadmuEF"     : return shouldPassHLT_Jets.muEF[:,0]  , passed_OFFJets.muEF[:,0]
-
-        elif analysis=="subleadchEmEF": return shouldPassHLT_Jets.chEmEF[:,1], passed_OFFJets.chEmEF[:,1]
-        elif analysis=="subleadchHEF" : return shouldPassHLT_Jets.chHEF[:,1] , passed_OFFJets.chHEF[:,1]
-        elif analysis=="subleadneEmEF": return shouldPassHLT_Jets.neEmEF[:,1], passed_OFFJets.neEmEF[:,1]
-        elif analysis=="subleadneHEF" : return shouldPassHLT_Jets.neHEF[:,1] , passed_OFFJets.neHEF[:,1]
-        elif analysis=="subleadmuEF"  : return shouldPassHLT_Jets.muEF[:,1]  , passed_OFFJets.muEF[:,1]
-    
-    elif "met" in analysis:
-        shouldPass_METCollections = METCollections
-        trigpassed_METCollections = DoCuts([HLTCut, "HLTCut"], METCollections=shouldPass_METCollections)[4]
-        passed_METCollections = trigpassed_METCollections
-        return shouldPass_METCollections.pt, passed_METCollections.pt
-    
-    elif "mjj" in analysis or "deta" in analysis:
-        shouldPass_jjsum = OFFcombo.jet1 + OFFcombo.jet2
-        shouldPass_mjj, shouldPass_deta = shouldPass_jjsum.mass, vector.Spatial.deltaeta(OFFcombo.jet1, OFFcombo.jet2)
-        trigpassed_OFFcombo = DoCuts([HLTCut, "HLTCut"], JetCombo=OFFcombo)[5]
-        if filterbits:
-            fbcut = trigpassed_OFFcombo.jet1.JetPassedHLT & trigpassed_OFFcombo.jet2.JetPassedHLT
-            fbpassed_combo_j1, fbpassed_combo_j2 = DoCuts([fbcut, "fbcut"], OFFJets=trigpassed_OFFcombo.jet1)[0], DoCuts([fbcut, "fbcut"], OFFJets=trigpassed_OFFcombo.jet2)[0]
-            passed_jjsum = fbpassed_combo_j1 + fbpassed_combo_j2
-            passed_mjj   = passed_jjsum.mass
-            passed_deta  = vector.Spatial.deltaeta(fbpassed_combo_j1, fbpassed_combo_j2)
-        else:
-            passed_jjsum = trigpassed_OFFcombo.jet1 + trigpassed_OFFcombo.jet2
-            passed_mjj   = passed_jjsum.mass
-            passed_deta  = vector.Spatial.deltaeta(trigpassed_OFFcombo.jet1, trigpassed_OFFcombo.jet2)
-        if   analysis=="mjj" : return ak.flatten(shouldPass_mjj) , ak.flatten(passed_mjj)
-        elif analysis=="deta": return abs(ak.flatten(shouldPass_deta)), abs(ak.flatten(passed_deta))
-"""
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer) : return int(obj)

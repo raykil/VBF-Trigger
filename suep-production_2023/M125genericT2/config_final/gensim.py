@@ -17,7 +17,7 @@ options.inputFiles = ['input.root']
 options.maxEvents = -1 # -1 means all events    
     
 options.register('seed',123456, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int)    
-options.seed = 123456    
+options.seed = 123456
 options.register( 'firstRun',    
                 1,  #default value    
                 VarParsing.VarParsing.multiplicity.singleton,    
@@ -108,6 +108,25 @@ process.RAWSIMoutput = cms.OutputModule("PoolOutputModule",
     fileName = cms.untracked.string(options.outputFile),
     outputCommands = process.RAWSIMEventContent.outputCommands,
     splitLevel = cms.untracked.int32(0)
+)
+
+process.RandomNumberGeneratorService = cms.Service("RandomNumberGeneratorService",
+    generator = cms.PSet(
+        engineName = cms.untracked.string('MixMaxRng'),
+        initialSeed = cms.untracked.uint32(options.seed)
+    ),
+	VtxSmeared = cms.PSet(
+        initialSeed = cms.untracked.uint32(options.seed),
+        engineName = cms.untracked.string('TRandom3')
+    ),
+    LHCTransport = cms.PSet(
+        initialSeed = cms.untracked.uint32(options.seed),
+        engineName = cms.untracked.string('TRandom3')
+    ),
+    g4SimHits = cms.PSet(
+        initialSeed = cms.untracked.uint32(options.seed),
+        engineName = cms.untracked.string('TRandom3')
+    )
 )
 
 # Additional output definition

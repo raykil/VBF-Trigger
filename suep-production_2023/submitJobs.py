@@ -17,6 +17,7 @@ parser.add_option("--nEvents"    , dest="nEvents"   , default=1000       , type=
 parser.add_option("--toSave"     , dest="toSave"    , default=['nanoaod'], type=str           , help="data tiers to save, in format of list") # minor problem here... enter the argument for now.
 parser.add_option("--doSubmit"   , dest="doSubmit"  , default=False      , action="store_true", help="If true, submit the jobs to condor")
 parser.add_option("--jobFlavour" , dest="jobFlavour", default='tomorrow' , type=str           , help="job flavour to add in submit.sub file")
+parser.add_option("--startpoint" , dest="startpoint", default=0          , type=int           , help="the starting number of the job submission.")
 (options, args) = parser.parse_args()
 
 tag        = f"M{options.M}{options.decay}T{options.T}"
@@ -25,6 +26,7 @@ nEvents    = options.nEvents
 toSave     = str(options.toSave).strip('[]').split(',')
 doSubmit   = options.doSubmit
 jobFlavour = options.jobFlavour
+startpoint = options.startpoint
 
 WORKDIR = f"/eos/user/j/jkil/vbftrigger/suep-production_2023/{tag}/"
 if not os.path.exists(f'{WORKDIR}jobs')          : os.mkdir(f'{WORKDIR}jobs')
@@ -39,14 +41,20 @@ for tier in toSave:
 if not os.path.isfile(f'{WORKDIR}jobs/proxy/x509up_u146772'): 
     os.system(f"voms-proxy-init -voms cms --rfc -valid 192:00 --out {WORKDIR}jobs/proxy/x509up_u146772")
 elif time.time() - os.stat(f'{WORKDIR}jobs/proxy/x509up_u146772')[stat.ST_MTIME] > 3600*24:
-    os.system(f"voms-proxy-init -voms cms --rfc -valid 192:00 --out {WORKDIR}jobs/proxy/")
+    os.system(f"voms-proxy-init -voms cms --rfc -valid 192:00 --out {WORKDIR}jobs/proxy/x509up_u146772")
 
-for j in range(nJobs):
+for j in range(startpoint, nJobs+startpoint):
     workdir = "/tmp/VBFSUEP_2023/"
     with open(f"{WORKDIR}jobs/exec/job_{j}.sh", 'w') as job:
         job.write("#!/bin/sh\n\n")
         job.write("echo '----- START -----'\n")
-        job.write(f"mkdir {workdir}\n")
+        #job.write(f"mkdir {workdir}\n")
+        job.write(f"if [ ! -d {workdir} ]; then\n")
+        job.write(f"    mkdir test_folder\n")
+        job.write(f"    echo 'folder created.'\n")
+        job.write(f"else\n")
+        job.write(f"    echo 'folder already exists. Skipping this step...'\n")
+        job.write(f"fi\n")
         job.write(f"cd {workdir}\n")
         job.write("source /cvmfs/cms.cern.ch/cmsset_default.sh\n")
         job.write(f"export X509_USER_PROXY={WORKDIR}jobs/proxy/x509up_u146772\n")

@@ -172,12 +172,35 @@ print(f"{datatier}_template.py succefssfully made: ./config_template/{datatier}_
 
 # Generating config_final
 if datatier=='gensim':
+    rand_string = f"\
+    process.RandomNumberGeneratorService = cms.Service('RandomNumberGeneratorService',\
+    \n    generator = cms.PSet(\
+    \n        engineName = cms.untracked.string('MixMaxRng'),\
+    \n        initialSeed = cms.untracked.uint32(options.seed)\
+    \n    ),\
+    \n    VtxSmeared = cms.PSet(\
+    \n        initialSeed = cms.untracked.uint32(options.seed),\
+    \n        engineName = cms.untracked.string('TRandom3')\
+    \n    ),\
+    \n    LHCTransport = cms.PSet(\
+    \n        initialSeed = cms.untracked.uint32(options.seed),\
+    \n        engineName = cms.untracked.string('TRandom3')\
+    \n    ),\
+    \n    g4SimHits = cms.PSet(\
+    \n        initialSeed = cms.untracked.uint32(options.seed),\
+    \n        engineName = cms.untracked.string('TRandom3')\
+    \n    )\
+    \n)\
+    \n\
+    \n# Additional output definition\
+    "
     with open(f"config_template/{datatier}_template.py", 'r') as template:
         with open(f"{datatier}.py",'w') as final:
             final.write(
                 template.read().replace(f"from Configuration.Eras.Era_{config_args['gensim']['ERA']}_cff import {config_args['gensim']['ERA']}", options_string)\
                                .replace('-13596', 'options.maxEvents')\
-                               .replace("    fileName = cms.untracked.string('{[FILEOUT]}'),", "    fileName = cms.untracked.string(options.outputFile),")
+                               .replace("    fileName = cms.untracked.string('{[FILEOUT]}'),", "    fileName = cms.untracked.string(options.outputFile),")\
+                               .replace("# Additional output definition", rand_string)
             )
     os.remove(f"fragments/{fragment}_final.py")
 else:
