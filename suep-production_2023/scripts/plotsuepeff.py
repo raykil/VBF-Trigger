@@ -40,7 +40,7 @@ elif 'mjj' in jsonpath:
     threshold = 1000 if 'pt105' in jsonpath else 720
 elif 'deta' in jsonpath:
     binsize = 0.1
-    maxbin  = 7
+    maxbin  = 8
     xlabel  = r"$\Delta\eta (j_1,j_2)$"
     plotname = 'deta'
     threshold = 3.5 if 'pt105' in jsonpath else 3.0

@@ -4,18 +4,17 @@
 """
 
 import os, json
-import uproot
-import vector
-import awkward as ak
+import uproot, vector
 import numpy as np
+import awkward as ak
 from optparse import OptionParser
 parser = OptionParser(usage="%prog [options]")
 
-parser.add_option('--triggerpath', dest='triggerpath', default='pt105', help='options: pt105, pt125.')
-parser.add_option('--analysis'   , dest='analysis'   , default='mjj'            , help='variable to analyze. Options: leadpt, subleadpt, mjj, deta.')
-parser.add_option('--tightcuts'  , dest='tightcuts', default=False, action='store_true', help='tight cuts.')
-parser.add_option('--nanodir'    , dest='nanodir', default='.', help='directory where nanoaod files are. End with /.')
-parser.add_option('--outputdir'  , dest='outputdir', type=str, default='.', help='path to directory of output json. End with /.')
+parser.add_option('--triggerpath', dest='triggerpath', default='pt105', type=str           , help='options: pt105, pt125.')
+parser.add_option('--analysis'   , dest='analysis'   , default='mjj'  , type=str           , help='variable to analyze. Options: leadpt, subleadpt, mjj, deta.')
+parser.add_option('--tightcuts'  , dest='tightcuts'  , default=False  , action='store_true', help='tight cuts.')
+parser.add_option('--nanodir'    , dest='nanodir'    , default='.'    , type=str           , help='directory where nanoaod files are. End with /.')
+parser.add_option('--outputdir'  , dest='outputdir'  , default='.'    , type=str           , help='path to directory of output json. End with /.')
 (options, args) = parser.parse_args()
 
 triggerpath = options.triggerpath
@@ -59,7 +58,7 @@ elif triggerpath=='pt125':
 
 numerator, denominator = [],[]
 
-for nanoaod in [n for n in os.listdir(nanodir) if 'nanoaod' in n][2:10]:
+for idx, nanoaod in enumerate([n for n in os.listdir(nanodir) if 'nanoaod' in n]):
     print(f'working on file {nanoaod}...')
     with uproot.open(f"{nanodir}{nanoaod}") as nano:
         events = vector.zip({
@@ -80,9 +79,9 @@ for nanoaod in [n for n in os.listdir(nanodir) if 'nanoaod' in n][2:10]:
             "HLT_pt125triple": nano["Events"]["HLT_VBF_DiPFJet125_45_Mjj720_Detajj3p0_TriplePFJet"].array(),
         })
 
-    print(f'number of events before jetId cut: {len(events)}')
+    if idx%100==0: print(f'number of events before jetId cut: {len(events)}')
     events = events[events.jetId >= 2]
-    print(f'number of events after  jetId cut: {len(events)}')
+    if idx%100==0: print(f'number of events after  jetId cut: {len(events)}')
     de, ef = (abs(events.eta) < 2.4), (triggerdict["chEmEF"] > events.chEmEF)
     events = events[(de & ef) | (~de & ef) | (~de & ~ef)]
     de, ef = (abs(events.eta) < 2.4), (triggerdict["chHEF"] > events.chHEF)
@@ -92,25 +91,25 @@ for nanoaod in [n for n in os.listdir(nanodir) if 'nanoaod' in n][2:10]:
     de, ef = (abs(events.eta) < 2.4), (triggerdict["neHEF"] > events.neHEF)
     events = events[(de & ef) | (~de & ef) | (~de & ~ef)]
     events = events[ak.num(events.jetId)>=2]
-    print(f'number of events after  EF cuts: {len(events)}')
+    if idx%100==0: print(f'number of events after  EF cuts: {len(events)}')
 
     jetcombo = ak.combinations(events,2, fields=["jet1","jet2"])
     if analysis != 'leadpt'   : 
         jetcombo = jetcombo[jetcombo.jet1.pt >= triggerdict["leadjetpt"]]
-        print(f'number of nonzero events after leadpt cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
+        if idx%100==0: print(f'number of nonzero events after leadpt cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
     if analysis != 'subleadpt': 
         jetcombo = jetcombo[jetcombo.jet2.pt >= triggerdict["subleadjetpt"]]
-        print(f'number of nonzero events after subleadpt cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
+        if idx%100==0: print(f'number of nonzero events after subleadpt cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
     if analysis != 'mjj'      : 
         jetcombo = jetcombo[(jetcombo.jet1+jetcombo.jet2).mass >= triggerdict["mjj"]]
-        print(f'number of nonzero events after mjj cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
+        if idx%100==0: print(f'number of nonzero events after mjj cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
     if analysis != 'deta'     : 
         jetcombo = jetcombo[abs(vector.Spatial.deltaeta(jetcombo.jet1, jetcombo.jet2)) >= triggerdict["deta"]]
-        print(f'number of nonzero events after deta cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
+        if idx%100==0: print(f'number of nonzero events after deta cut: {ak.count_nonzero(ak.num(jetcombo.jet1.pt))}')
 
     survived = ak.where(ak.num(jetcombo.jet1.pt)>0,True,False)
     events, jetcombo = events[survived], jetcombo[survived]
-    print(f'number of events after survival cuts: {len(events)}')
+    if idx%100==0: print(f'number of events after survival cuts: {len(events)}')
 
     maxmjjarg = ak.argmax((jetcombo.jet1+jetcombo.jet2).mass, axis=1)
     if len(maxmjjarg)>1: denom_jetcombo = jetcombo[ak.unflatten(maxmjjarg,1)]
